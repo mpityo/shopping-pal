@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Shopping Pal">
+  <rect width="512" height="512" fill="#12603d" />
+  <!-- Basket: squared-off, wayfinding-sign flavoured -->
+  <path
+    d="M120 176h272l-28 216a24 24 0 0 1-24 21H172a24 24 0 0 1-24-21z"
+    fill="none"
+    stroke="#faf9f5"
+    stroke-width="26"
+    stroke-linejoin="round"
+  />
+  <path
+    d="M196 176v-24a60 60 0 0 1 120 0v24"
+    fill="none"
+    stroke="#faf9f5"
+    stroke-width="26"
+    stroke-linecap="round"
+  />
+  <!-- Checked-off line -->
+  <path
+    d="M198 268l38 40 82-88"
+    fill="none"
+    stroke="#ffcf3d"
+    stroke-width="30"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+  />
+</svg>
