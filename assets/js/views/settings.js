@@ -405,7 +405,7 @@ function aboutCard() {
         ),
         about(
           'The shared list',
-          'One encrypted file in this repo. Your browser encrypts it with the household passphrase before it is uploaded and decrypts it after download, so the passphrase never leaves the device and there is no server that could read the list.',
+          'One encrypted file in this repo, locked with a 256-bit key the app generates. Encryption and decryption happen in your browser; the key travels only in the fragment of the invite link, which browsers never send to a server. Nobody without the link can read the file, and nobody can guess their way in.',
         ),
       ),
     ),

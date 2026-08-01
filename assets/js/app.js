@@ -143,7 +143,7 @@ function renderSyncStatus() {
   if (status.state === 'off') return;
 
   const labels = {
-    locked: 'Shared list locked',
+    locked: 'Shared list — needs the invite link',
     syncing: 'Syncing…',
     ok: 'Shared list in sync',
     readonly: 'Shared list — read-only',
@@ -165,18 +165,39 @@ function renderSyncStatus() {
 
 // ── Shared lists ─────────────────────────────────────────────────────────
 
+function hashParams() {
+  const raw = location.hash.split('?')[1];
+  return new URLSearchParams(raw || '');
+}
+
+/**
+ * Adopt the key from an invite link.
+ *
+ * The key is deliberately left in the address bar afterwards. It is the
+ * credential, and stripping it would break Add to Home Screen: an installed
+ * iOS web app gets its own storage container, so it has to receive the key
+ * through the URL it was installed from rather than from Safari's storage.
+ */
+function consumeInviteKey() {
+  const key = hashParams().get('k');
+  if (!key) return false;
+  const adopted = sync.adoptKey(key);
+  if (adopted) toast('Opening the shared list…');
+  return adopted;
+}
+
 /**
  * A `?share=` payload in the hash replaces the working list, so it asks first
  * rather than silently overwriting whatever the other person had going.
  */
 function consumeSharedList() {
-  const raw = location.hash.split('?')[1];
-  if (!raw) return;
-  const params = new URLSearchParams(raw);
+  const params = hashParams();
   const payload = params.get('share');
   if (!payload) return;
 
-  history.replaceState(null, '', `${location.pathname}#/list`);
+  // Drop only the share payload; an invite key in the same hash must survive.
+  const key = params.get('k');
+  history.replaceState(null, '', `${location.pathname}#/list${key ? `?k=${key}` : ''}`);
 
   const hasList = store.listCount() > 0;
   if (hasList && !confirm('Open the shared list? This replaces the list currently in this browser.')) {
@@ -198,6 +219,7 @@ function consumeSharedList() {
 // ── Boot ─────────────────────────────────────────────────────────────────
 
 window.addEventListener('hashchange', () => {
+  if (consumeInviteKey()) sync.resume();
   consumeSharedList();
   render();
   window.scrollTo({ top: 0 });
@@ -212,15 +234,17 @@ store.subscribe(() => {
 
 sync.subscribe(() => renderSyncStatus());
 
+consumeInviteKey();
 consumeSharedList();
 render();
 
-// Reopen a shared list that was set up on this device previously.
+// Open the shared list: either from a key just handed over by an invite link,
+// or one this device already had.
 sync.resume().then((opened) => {
   if (opened) return;
   if (sync.needsUnlock()) {
-    toast('The shared list is locked on this device', {
-      action: 'Unlock',
+    toast('The shared list needs its invite link on this device', {
+      action: 'Open',
       onAction: () => ctx.go('settings'),
     });
   }

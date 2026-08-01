@@ -1,10 +1,11 @@
 /**
- * Setup UI for the shared, passphrase-encrypted list.
+ * Setup UI for the shared, encrypted list.
  *
- * Two deliberate pieces of friction live here: the passphrase strength gate,
- * and the plain warning about what putting a token in the vault means. The
- * file is public and permanent, so both matter more than they would behind a
- * login.
+ * The key is generated, never typed, so there is no passphrase field and no
+ * strength meter to argue with. What replaces them is being clear about what
+ * the invite link *is*: possession of it is access to the list, so it gets
+ * handled like a credential — revealed on request rather than sat on screen,
+ * and rotatable in one click.
  */
 import { h, modal, toast } from '../util.js';
 import * as sync from '../sync.js';
@@ -49,7 +50,7 @@ export function sharingCard(ctx) {
 function statusBadge(status) {
   const map = {
     off: ['badge--plain', 'Not set up'],
-    locked: ['badge--due', 'Locked'],
+    locked: ['badge--due', 'Needs the link'],
     syncing: ['badge--plain', 'Syncing…'],
     ok: ['badge--person', 'In sync'],
     readonly: ['badge--deal', 'Read-only'],
@@ -70,13 +71,13 @@ function notConnected(ctx) {
     h(
       'p',
       {},
-      'Keep one list across every phone in the house. The list, catalog and trip history are encrypted in the browser with a passphrase you choose, and stored as a single file in this repo.',
+      'Keep one list across every phone in the house. The list, catalog and trip history are encrypted in the browser and stored as a single file in this repo. Everyone gets in with one invite link.',
     ),
     h(
       'div',
       { class: 'notice' },
-      h('strong', {}, 'This repo is public'),
-      'Anyone can download the encrypted file. They cannot read it without the passphrase, but they can try to guess it for as long as they like — so use a long one. Nobody who lacks the passphrase learns anything about your list.',
+      h('strong', {}, 'How it is protected'),
+      'The app generates a random 256-bit key — nothing you have to invent or remember. It rides in the link’s fragment, which browsers never send to a server. The repo is public, so anyone can download the encrypted file, but there is no guessing their way into it.',
     ),
     owner && repo
       ? h('p', { class: 'dept-note' }, `Detected repo: ${owner}/${repo}`)
@@ -90,7 +91,7 @@ function notConnected(ctx) {
       'div',
       { class: 'btn-row' },
       h('button', { class: 'btn btn--primary', onClick: () => createDialog(ctx) }, 'Create the shared list'),
-      h('button', { class: 'btn btn--ghost', onClick: () => joinDialog(ctx) }, 'Join an existing one'),
+      h('button', { class: 'btn btn--ghost', onClick: () => joinDialog(ctx) }, 'Open with a link'),
     ),
   );
 }
@@ -98,90 +99,92 @@ function notConnected(ctx) {
 // ── Connected ────────────────────────────────────────────────────────────
 
 function connected(ctx, cfg, status) {
-  const locked = status.state === 'locked';
+  if (status.state === 'locked') {
+    return h(
+      'div',
+      {},
+      h(
+        'p',
+        {},
+        'The shared list is set up for this repo, but this device does not have the key. Open the invite link, or paste it below.',
+      ),
+      h(
+        'div',
+        { class: 'btn-row' },
+        h('button', { class: 'btn btn--primary', onClick: () => joinDialog(ctx) }, 'Paste the invite link'),
+        h('button', { class: 'btn btn--ghost', onClick: () => disconnect(ctx) }, 'Forget on this device'),
+      ),
+    );
+  }
 
   return h(
     'div',
     {},
-    locked
+    h(
+      'p',
+      { class: 'dept-note' },
+      `${cfg.owner}/${cfg.repo} · ${cfg.path}`,
+      status.lastSync ? ` · last synced ${new Date(status.lastSync).toLocaleString()}` : '',
+    ),
+    status.message ? h('p', {}, status.message) : null,
+    status.state === 'readonly'
       ? h(
           'div',
-          {},
-          h('p', {}, 'The shared list is set up on this device but locked. Enter the passphrase to open it.'),
-          h(
-            'div',
-            { class: 'btn-row' },
-            h('button', { class: 'btn btn--primary', onClick: () => joinDialog(ctx) }, 'Unlock'),
-            h('button', { class: 'btn btn--ghost', onClick: () => disconnect(ctx) }, 'Forget on this device'),
-          ),
+          { class: 'notice notice--warn' },
+          h('strong', {}, 'Read-only on this device'),
+          'Changes are saved here but not shared, because there is no GitHub token. Add one below to save for everyone.',
         )
-      : h(
+      : null,
+    status.state === 'error'
+      ? h('div', { class: 'notice notice--warn' }, h('strong', {}, 'Last sync failed'), status.message)
+      : null,
+    cfg.tokenInVault
+      ? h(
           'div',
-          {},
-          h(
-            'p',
-            { class: 'dept-note' },
-            `${cfg.owner}/${cfg.repo} · ${cfg.path}`,
-            status.lastSync ? ` · last synced ${new Date(status.lastSync).toLocaleString()}` : '',
-          ),
-          status.message ? h('p', {}, status.message) : null,
-          status.state === 'readonly'
-            ? h(
-                'div',
-                { class: 'notice notice--warn' },
-                h('strong', {}, 'Read-only on this device'),
-                'Changes are saved here but not shared, because there is no GitHub token. Add one below to save for everyone.',
-              )
-            : null,
-          status.state === 'error'
-            ? h('div', { class: 'notice notice--warn' }, h('strong', {}, 'Last sync failed'), status.message)
-            : null,
-          cfg.tokenInVault
-            ? h(
-                'div',
-                { class: 'notice' },
-                h('strong', {}, 'Passphrase grants editing'),
-                'The access token is stored inside the encrypted file, so anyone with the passphrase can edit the list. Rotate the token if the passphrase ever gets out.',
-              )
-            : null,
-          h(
-            'div',
-            { class: 'btn-row' },
-            h(
-              'button',
-              {
-                class: 'btn btn--ghost',
-                onClick: async () => {
-                  await sync.pull();
-                  toast('Checked for changes');
-                  ctx.rerender();
-                },
-              },
-              'Sync now',
-            ),
-            h(
-              'button',
-              {
-                class: 'btn btn--ghost',
-                onClick: async () => {
-                  const ok = await sync.push();
-                  toast(ok ? 'Saved to the shared list' : 'Could not save — see the message above');
-                  ctx.rerender();
-                },
-              },
-              'Save now',
-            ),
-            h('button', { class: 'btn btn--ghost', onClick: () => tokenDialog(ctx) }, 'Access token'),
-            h('button', { class: 'btn btn--danger', onClick: () => disconnect(ctx) }, 'Forget on this device'),
-          ),
-        ),
+          { class: 'notice' },
+          h('strong', {}, 'The invite link grants editing'),
+          'The access token is stored inside the encrypted file, so anyone holding the link can edit the list. Treat it like a house key — and rotate it below if it ever goes astray.',
+        )
+      : null,
+    h(
+      'div',
+      { class: 'btn-row' },
+      h('button', { class: 'btn btn--primary', onClick: () => showLink(ctx) }, 'Invite link'),
+      h(
+        'button',
+        {
+          class: 'btn btn--ghost',
+          onClick: async () => {
+            await sync.pull();
+            toast('Checked for changes');
+            ctx.rerender();
+          },
+        },
+        'Sync now',
+      ),
+      h(
+        'button',
+        {
+          class: 'btn btn--ghost',
+          onClick: async () => {
+            const ok = await sync.push();
+            toast(ok ? 'Saved to the shared list' : 'Could not save — see the message above');
+            ctx.rerender();
+          },
+        },
+        'Save now',
+      ),
+      h('button', { class: 'btn btn--ghost', onClick: () => tokenDialog(ctx) }, 'Access token'),
+      h('button', { class: 'btn btn--danger', onClick: () => rotateDialog(ctx) }, 'Rotate key'),
+      h('button', { class: 'btn btn--danger', onClick: () => disconnect(ctx) }, 'Forget device'),
+    ),
   );
 }
 
 function disconnect(ctx) {
   if (
     !confirm(
-      'Forget the shared list on this device? Your local list and history stay exactly as they are, and the shared file is not deleted.',
+      'Forget the shared list on this device? Your local list and history stay exactly as they are, and the shared file is not deleted. You will need the invite link to get back in.',
     )
   ) {
     return;
@@ -191,18 +194,128 @@ function disconnect(ctx) {
   ctx.rerender();
 }
 
-// ── Shared form pieces ───────────────────────────────────────────────────
+// ── Invite link ──────────────────────────────────────────────────────────
 
-function passphraseField(id, label, onRate) {
-  const input = h('input', {
-    type: 'password',
-    id,
-    autocomplete: 'new-password',
-    required: true,
-    onInput: onRate,
+/**
+ * Shows the link behind an explicit action rather than printing it into the
+ * page: it is the credential, and Setup gets left open on shared screens.
+ */
+function showLink(ctx, { title = 'Invite link', intro = null } = {}) {
+  const link = sync.inviteLink();
+  if (!link) {
+    toast('This device does not have the key');
+    return;
+  }
+
+  const field = h('textarea', {
+    readonly: true,
+    rows: 3,
+    value: link,
+    style: { fontFamily: 'var(--mono)', fontSize: '0.78rem' },
+    onFocus: (e) => e.target.select(),
   });
-  return { input, node: h('div', { class: 'field' }, h('label', { for: id }, label), input) };
+
+  const dialog = modal(
+    title,
+    h(
+      'div',
+      {},
+      intro,
+      h(
+        'p',
+        {},
+        'Send this to everyone in the house. Opening it puts the list on their phone — they can then use Add to Home Screen and it keeps working.',
+      ),
+      h(
+        'div',
+        { class: 'notice notice--warn' },
+        h('strong', {}, 'This link is the key'),
+        'Anyone who gets hold of it can read and edit the list. Send it through something private — a message to the household, AirDrop, a password manager — not a public channel. Rotate the key if it leaks.',
+      ),
+      h('div', { class: 'field' }, field),
+      h(
+        'div',
+        { class: 'btn-row' },
+        h(
+          'button',
+          {
+            class: 'btn btn--primary',
+            type: 'button',
+            onClick: async () => {
+              try {
+                if (navigator.share) {
+                  await navigator.share({ title: 'Shopping Pal', url: link });
+                } else {
+                  await navigator.clipboard.writeText(link);
+                  toast('Invite link copied');
+                }
+              } catch {
+                field.focus();
+                field.select();
+                toast('Copy the highlighted link');
+              }
+            },
+          },
+          navigator.share ? 'Send link' : 'Copy link',
+        ),
+        h('button', { class: 'btn btn--ghost', type: 'button', onClick: () => dialog.close() }, 'Done'),
+      ),
+    ),
+  );
+  return dialog;
 }
+
+function rotateDialog(ctx) {
+  const dialog = modal(
+    'Rotate the key?',
+    h(
+      'div',
+      {},
+      h(
+        'p',
+        {},
+        'This re-encrypts the shared list under a brand new key. Every existing invite link stops working immediately, including on your own other devices — you will need to send the new link to everyone again.',
+      ),
+      h('p', { class: 'hint' }, 'Nothing on the list is lost; outstanding changes are merged in first.'),
+      h(
+        'div',
+        { class: 'btn-row' },
+        h(
+          'button',
+          {
+            class: 'btn btn--danger',
+            onClick: async (e) => {
+              e.target.disabled = true;
+              e.target.textContent = 'Rotating…';
+              try {
+                await sync.rotateKey();
+                dialog.close();
+                showLink(ctx, {
+                  title: 'New invite link',
+                  intro: h(
+                    'div',
+                    { class: 'notice' },
+                    h('strong', {}, 'Key rotated'),
+                    'The old links are dead. This is the replacement.',
+                  ),
+                });
+                ctx.rerender();
+              } catch (err) {
+                alert(err.message);
+                e.target.disabled = false;
+                e.target.textContent = 'Rotate the key';
+              }
+            },
+          },
+          'Rotate the key',
+        ),
+        h('button', { class: 'btn btn--ghost', onClick: () => dialog.close() }, 'Cancel'),
+      ),
+    ),
+  );
+}
+
+// ── Shared form pieces ───────────────────────────────────────────────────
 
 function repoFields(cfg) {
   const detected = sync.detectRepo();
@@ -215,7 +328,9 @@ function repoFields(cfg) {
     'details',
     { style: { marginBottom: '0.9rem' } },
     h('summary', { style: { cursor: 'pointer', fontSize: '0.85rem', fontWeight: '700' } }, 'Repo settings'),
-    h('div', { style: { paddingTop: '0.6rem' } },
+    h(
+      'div',
+      { style: { paddingTop: '0.6rem' } },
       h('div', { class: 'field' }, h('label', { for: 'sync-owner' }, 'Owner'), owner),
       h('div', { class: 'field' }, h('label', { for: 'sync-repo' }, 'Repo'), repo),
       h('div', { class: 'field' }, h('label', { for: 'sync-branch' }, 'Branch'), branch),
@@ -223,7 +338,15 @@ function repoFields(cfg) {
     ),
   );
 
-  return { node, values: () => ({ owner: owner.value.trim(), repo: repo.value.trim(), branch: branch.value.trim(), path: path.value.trim() }) };
+  return {
+    node,
+    values: () => ({
+      owner: owner.value.trim(),
+      repo: repo.value.trim(),
+      branch: branch.value.trim(),
+      path: path.value.trim(),
+    }),
+  };
 }
 
 function tokenHelp() {
@@ -236,24 +359,10 @@ function tokenHelp() {
   );
 }
 
-function busy(button, label) {
-  button.disabled = true;
-  button.textContent = label;
-}
-
 // ── Create ───────────────────────────────────────────────────────────────
 
 function createDialog(ctx) {
   const cfg = sync.getConfig();
-  const rating = h('p', { class: 'hint' }, 'Use four random words, or a long phrase only you would say.');
-
-  const pass = passphraseField('vault-pass', 'Passphrase', (e) => {
-    const result = vault.ratePassphrase(e.target.value);
-    rating.textContent = result.message;
-    rating.style.color =
-      result.level === 'strong' ? 'var(--brand)' : result.level === 'fair' ? 'var(--ink-2)' : 'var(--alert)';
-  });
-  const confirmInput = h('input', { type: 'password', id: 'vault-pass2', autocomplete: 'new-password', required: true });
   const tokenInput = h('input', { type: 'password', id: 'vault-token', autocomplete: 'off', required: true });
   const inVault = h('input', { type: 'checkbox', id: 'vault-token-shared', checked: true });
   const repo = repoFields(cfg);
@@ -268,27 +377,24 @@ function createDialog(ctx) {
         onSubmit: async (e) => {
           e.preventDefault();
           error.textContent = '';
-
-          const quality = vault.ratePassphrase(pass.input.value);
-          if (!quality.ok) {
-            error.textContent = `Pick a stronger passphrase — ${quality.message}`;
-            return;
-          }
-          if (pass.input.value !== confirmInput.value) {
-            error.textContent = 'The two passphrases do not match.';
-            return;
-          }
-
-          busy(submit, 'Creating…');
+          submit.disabled = true;
+          submit.textContent = 'Creating…';
           try {
             await sync.createVault({
-              passphrase: pass.input.value,
               token: tokenInput.value.trim(),
               tokenInVault: inVault.checked,
               ...repo.values(),
             });
             dialog.close();
-            toast('Shared list created — share the passphrase with the household');
+            showLink(ctx, {
+              title: 'Shared list created',
+              intro: h(
+                'div',
+                { class: 'notice' },
+                h('strong', {}, 'Here is the only way in'),
+                'There is no password to recover and no reset. Save this link somewhere you trust before closing.',
+              ),
+            });
             ctx.rerender();
           } catch (err) {
             error.textContent = err.message;
@@ -300,11 +406,8 @@ function createDialog(ctx) {
       h(
         'p',
         { class: 'hint' },
-        'Everything is encrypted in this browser before it leaves. The passphrase is never sent anywhere and cannot be recovered — if it is lost, the shared list is unreadable.',
+        'The app generates the encryption key for you — there is nothing to choose or remember. You will get an invite link to send to the household.',
       ),
-      pass.node,
-      rating,
-      h('div', { class: 'field' }, h('label', { for: 'vault-pass2' }, 'Passphrase again'), confirmInput),
       h('div', { class: 'field' }, h('label', { for: 'vault-token' }, 'GitHub access token'), tokenHelp(), tokenInput),
       h(
         'div',
@@ -316,13 +419,13 @@ function createDialog(ctx) {
           h(
             'label',
             { for: 'vault-token-shared', style: { margin: 0, fontWeight: '400' } },
-            'Store the token inside the encrypted file, so anyone with the passphrase can edit',
+            'Store the token inside the encrypted file, so the invite link alone allows editing',
           ),
         ),
         h(
           'p',
           { class: 'hint' },
-          'On: everyone just needs the passphrase. Off: the passphrase gives read access, and each person adds their own token to edit. Leaving it on means a guessed passphrase also yields a token that can write to this repo — which is why the passphrase check above is strict.',
+          'On: everyone just needs the link. Off: the link gives read access, and each person adds their own token to edit — worth it if you would rather one person’s lost phone not carry write access for everybody.',
         ),
       ),
       repo.node,
@@ -338,13 +441,20 @@ function createDialog(ctx) {
   );
 }
 
-// ── Join / unlock ────────────────────────────────────────────────────────
+// ── Join ─────────────────────────────────────────────────────────────────
 
 function joinDialog(ctx) {
   const cfg = sync.getConfig();
-  const passInput = h('input', { type: 'password', id: 'join-pass', autocomplete: 'current-password', required: true });
+  const linkInput = h('textarea', {
+    id: 'join-link',
+    rows: 3,
+    required: true,
+    placeholder: 'Paste the invite link',
+    style: { fontFamily: 'var(--mono)', fontSize: '0.78rem' },
+  });
   const tokenInput = h('input', { type: 'password', id: 'join-token', autocomplete: 'off' });
   const remember = h('input', { type: 'checkbox', id: 'join-remember', checked: true });
+  const legacy = h('input', { type: 'password', id: 'join-passphrase', autocomplete: 'off' });
   const repo = repoFields(cfg);
   const submit = h('button', { class: 'btn btn--primary', type: 'submit' }, 'Open shared list');
   const error = h('p', { class: 'hint', style: { color: 'var(--alert)' } });
@@ -357,16 +467,30 @@ function joinDialog(ctx) {
         onSubmit: async (e) => {
           e.preventDefault();
           error.textContent = '';
-          busy(submit, 'Opening…');
+          submit.disabled = true;
+          submit.textContent = 'Opening…';
           try {
-            await sync.unlock({
-              passphrase: passInput.value,
+            const result = await sync.unlock({
+              key: linkInput.value,
+              passphrase: legacy.value.trim() || undefined,
               token: tokenInput.value.trim() || undefined,
               remember: remember.checked,
               ...repo.values(),
             });
             dialog.close();
-            toast('Shared list opened');
+            if (result.upgraded) {
+              showLink(ctx, {
+                title: 'Upgraded to a generated key',
+                intro: h(
+                  'div',
+                  { class: 'notice' },
+                  h('strong', {}, 'The passphrase no longer opens this list'),
+                  'It was replaced with a generated key that cannot be guessed. Send this link to the household.',
+                ),
+              });
+            } else {
+              toast('Shared list opened');
+            }
             ctx.rerender();
           } catch (err) {
             error.textContent = err.message;
@@ -378,9 +502,9 @@ function joinDialog(ctx) {
       h(
         'p',
         { class: 'hint' },
-        'Anything already on this device is merged with the shared list rather than replaced.',
+        'Normally you just open the invite link and this happens automatically. Paste it here if the link will not open directly. Anything already on this device is merged in rather than replaced.',
       ),
-      h('div', { class: 'field' }, h('label', { for: 'join-pass' }, 'Passphrase'), passInput),
+      h('div', { class: 'field' }, h('label', { for: 'join-link' }, 'Invite link or key'), linkInput),
       h(
         'div',
         { class: 'field' },
@@ -399,16 +523,26 @@ function joinDialog(ctx) {
           'div',
           { style: { display: 'flex', gap: '0.5rem', alignItems: 'center' } },
           remember,
-          h(
-            'label',
-            { for: 'join-remember', style: { margin: 0, fontWeight: '400' } },
-            'Stay unlocked on this device',
-          ),
+          h('label', { for: 'join-remember', style: { margin: 0, fontWeight: '400' } }, 'Stay open on this device'),
+        ),
+      ),
+      h(
+        'details',
+        { style: { marginBottom: '0.9rem' } },
+        h(
+          'summary',
+          { style: { cursor: 'pointer', fontSize: '0.85rem', fontWeight: '700' } },
+          'This list was made with a passphrase',
         ),
         h(
-          'p',
-          { class: 'hint' },
-          'Off means typing the passphrase each visit. On stores it in this browser — fine for a personal phone, not for a shared computer.',
+          'div',
+          { style: { paddingTop: '0.6rem' } },
+          h(
+            'p',
+            { class: 'hint' },
+            'Only for lists created by the earlier version. Entering the passphrase opens it and replaces it with a generated key.',
+          ),
+          h('div', { class: 'field' }, h('label', { for: 'join-passphrase' }, 'Old passphrase'), legacy),
         ),
       ),
       repo.node,

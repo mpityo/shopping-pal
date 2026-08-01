@@ -13,8 +13,8 @@ It answers the things Notes could not:
   the trip goes by department, trip size over time.
 - **Publix BOGOs.** This week's buy-one-get-one deals, cross-referenced against
   the things you actually buy.
-- **One list for everyone.** An encrypted file in this repo, opened with a
-  passphrase — every phone in the house sees the same list.
+- **One list for everyone.** An encrypted file in this repo, opened by an
+  invite link — every phone in the house sees the same list.
 
 ## Using it
 
@@ -44,46 +44,69 @@ follow whatever you name people.
 Without it, each phone keeps its own copy in browser storage. Turn it on and
 every phone reads and writes one file, `data/vault.json`, in this repo.
 
-Set it up once from **Setup → Shared list → Create the shared list**: pick a
-passphrase and paste a GitHub token. Everyone else picks **Join an existing
-one** and types the passphrase. Edits are merged, not overwritten — two people
-in different aisles can both add to the list, a check on one phone shows up on
-the other, and a deletion is not resurrected by the other device's copy.
+Set it up once from **Setup → Shared list → Create the shared list**: paste a
+GitHub token, and the app hands you an **invite link**. Send that link to
+everyone in the house. Opening it puts the list on their phone; Add to Home
+Screen from there and it keeps working. Edits are merged, not overwritten —
+two people in different aisles can both add to the list, a check on one phone
+shows up on the other, and a deletion is not resurrected by the other device's
+copy.
 
 ### How it is protected
 
-The list is encrypted **in the browser** with AES-256-GCM, using a key derived
-from the passphrase with PBKDF2-HMAC-SHA-256 at 600,000 iterations. The
-passphrase is never uploaded, and there is no server that could read it. The
-file in the repo contains a salt, an IV, and ciphertext — nothing else.
+The app generates a random 256-bit key. There is no passphrase to invent,
+remember, or type. The list is encrypted in the browser with AES-256-GCM under
+that key, and the file in the repo contains an IV and ciphertext — nothing
+else.
 
-**Be honest with yourself about the tradeoff:** this repo is public, so the
-encrypted file can be downloaded by anyone, kept forever, and attacked offline
-at their leisure. There is no rate limit and no lockout to save you. Its
-security is exactly the strength of the passphrase — which is why setup refuses
-short or common ones. Four random words is the easy way to get this right.
+The key travels in the **fragment** of the invite link (`#/list?k=…`). Browsers
+never put the fragment in an HTTP request, so it does not reach GitHub's
+servers, the Pages CDN, or anything in between.
+
+**Why generated and not chosen.** The repo is public, so the ciphertext can be
+downloaded by anyone and attacked offline forever, with no rate limit to slow
+it down. That makes the secret's entropy the entire defence:
+
+| Secret | Time to break offline (1 GPU) |
+| --- | --- |
+| A phrase someone invented | hours |
+| Four genuinely random words | thousands of years |
+| Generated 256-bit key | not possible, at any budget |
+
+A password field cannot tell the difference between the first two rows, which
+is why there isn't one.
+
+**The trade this makes:** possession of the link is access to the list. Send it
+through something private — a message to the household, AirDrop, a password
+manager — not a public channel. The key stays in the address bar so that Add to
+Home Screen works (an installed iOS web app has its own storage and has to
+receive the key through the URL it was installed from), so treat a screen-share
+of Setup the way you'd treat one of your password manager.
+
+If a link ever goes astray: **Setup → Shared list → Rotate key** re-encrypts
+under a fresh key and kills every existing link, including your own. Nothing on
+the list is lost.
 
 ### Why a token is also needed
 
-Reading takes only the passphrase. Writing means committing to the repo, which
-GitHub requires authentication for, and a static page has nowhere safe to keep
-a shared secret. So setup offers two options:
+Reading takes only the link. Writing means committing to the repo, which GitHub
+requires authentication for, and a static page has nowhere safe to keep a
+shared secret. Two options at setup:
 
-- **Token stored inside the encrypted file** (default) — the passphrase alone
-  lets anyone in the household edit. Simplest, and the one most people want.
-  It also means a cracked passphrase yields a token that can write to this
-  repo, so treat the passphrase as the real credential and rotate the token if
-  it ever leaks.
-- **Token per device** — the passphrase grants read-only access, and each
-  person adds their own token in Setup to be able to save. More setup, smaller
-  blast radius.
+- **Token inside the encrypted file** (default) — the invite link alone lets
+  anyone in the household edit. This is only sound because the key is
+  generated: with a typed passphrase, cracking it would also hand over a token
+  that can write to this repo.
+- **Token per device** — the link grants read access, and each person adds
+  their own token in Setup to save. Worth it if you'd rather one lost phone not
+  carry write access for everybody.
 
 Either way, use a **fine-grained** token scoped to this repository only, with
 **Contents: Read and write** and nothing else, and set an expiry.
 
-If you would rather not use any of this: skip it entirely. The app is fully
-functional as a local-only list, and **Setup → Export a backup** moves data
-between phones by hand.
+If you'd rather not use any of this: skip it. The app is fully functional as a
+local-only list, and **Setup → Export a backup** moves data between phones by
+hand.
 
 ## Where the data comes from
 
@@ -127,7 +150,7 @@ numbers. Nothing is estimated or filled in for you.
 3. Optional: set a repository variable `PUBLIX_STORE_NUMBER` to your store's
    number for store-specific deals.
 4. Optional: open the site, go to **Setup → Household** and name everyone, then
-   **Setup → Shared list** to put the list on every phone.
+   **Setup → Shared list** to put the list on every phone via an invite link.
 
 The repo owner and name are read from the page's own URL, so nothing needs
 configuring in code. On a custom domain, fill them in under "Repo settings"
@@ -157,7 +180,7 @@ assets/js/app.js               router + shell rendering
 assets/js/store.js             state, persistence, actions
 assets/js/insights.js          cadence and trend maths
 assets/js/deals-data.js        BOGO feed loading + catalog matching
-assets/js/crypto.js            passphrase encryption for the shared list
+assets/js/crypto.js            key generation + encryption for the shared list
 assets/js/sync.js              reading/writing the shared file on GitHub
 assets/js/data/catalog.js      the seed list from Notes
 assets/js/data/departments.js  the store route

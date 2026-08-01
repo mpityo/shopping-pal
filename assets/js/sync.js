@@ -1,21 +1,20 @@
 /**
  * Shared list over a public repo.
  *
- * The household list lives in one encrypted file in this repo. Reading it
- * needs only the passphrase. Writing it needs a GitHub token as well, because
- * committing to a repo is an authenticated operation and there is no server
- * here to hold a secret on everyone's behalf.
+ * The household list lives in one encrypted file in this repo, opened with a
+ * generated 256-bit key that travels in the fragment of an invite link. The
+ * fragment is never sent to a server, and the key is never derived from
+ * anything a person chose, so the public ciphertext is not brute-forceable.
  *
- * The token can be supplied two ways, chosen at setup:
- *   - stored inside the encrypted vault, so the passphrase alone grants edit
- *     access to anyone in the household (convenient, and the token is only as
- *     safe as the passphrase — see the warnings in Setup and the README)
- *   - stored only in each person's browser, so the passphrase grants read and
- *     each editor brings their own token (safer, slightly more setup)
+ * Writing also needs a GitHub token, because committing is an authenticated
+ * operation and a static page has nowhere safe to keep a shared secret. By
+ * default the token rides inside the encrypted vault, so holding the invite
+ * link is all it takes to edit. That is only sound because the key is
+ * generated: with a typed passphrase, cracking it would also yield the token.
  *
- * Everything here degrades: with no passphrase the app is purely local, with a
- * passphrase but no token it is read-only, and with no network it uses the
- * last state it saw.
+ * Everything here degrades: with no key the app is purely local, with a key
+ * but no token it is read-only, and with no network it uses the last state it
+ * saw.
  */
 import * as crypto from './crypto.js';
 import * as store from './store.js';
@@ -27,9 +26,9 @@ const DEFAULT_PATH = 'data/vault.json';
 const listeners = new Set();
 
 let config = loadConfig();
-/** Passphrase and token live in memory; persisted only if "remember" is on. */
+/** The list key and token, in memory; persisted unless "remember" is off. */
 let session = {
-  passphrase: config.passphrase ?? null,
+  key: config.key ?? null,
   token: config.token ?? null,
   vaultToken: null,
 };
@@ -62,7 +61,7 @@ function defaults() {
     branch: 'main',
     path: DEFAULT_PATH,
     remember: true,
-    passphrase: null,
+    key: null,
     token: null,
     tokenInVault: false,
     lastSync: null,
@@ -72,14 +71,26 @@ function defaults() {
 function saveConfig() {
   const toStore = { ...config };
   if (!config.remember) {
-    toStore.passphrase = null;
+    toStore.key = null;
     toStore.token = null;
   }
   localStorage.setItem(CONFIG_KEY, JSON.stringify(toStore));
 }
 
 export function getConfig() {
-  return { ...config, hasPassphrase: Boolean(session.passphrase), hasToken: Boolean(writeToken()) };
+  const { key, token, ...rest } = config;
+  // The key and token are never handed to view code; only whether they exist.
+  return { ...rest, hasKey: Boolean(session.key), hasToken: Boolean(writeToken()) };
+}
+
+/**
+ * The link that grants access: the key rides in the fragment, which browsers
+ * do not put in HTTP requests, so it never reaches GitHub's servers or any
+ * proxy in between.
+ */
+export function inviteLink() {
+  if (!session.key) return null;
+  return `${location.origin}${location.pathname}#/list?k=${session.key}`;
 }
 
 /**
@@ -228,10 +239,10 @@ function absorb(payload) {
 // ── Public operations ────────────────────────────────────────────────────
 
 /**
- * Create the shared file for the first time. Requires a token — the file has
- * to be committed before anyone can read it.
+ * Create the shared file for the first time, with a freshly generated key.
+ * Requires a token — the file has to be committed before anyone can read it.
  */
-export async function createVault({ passphrase, token, tokenInVault, owner, repo, branch, path }) {
+export async function createVault({ token, tokenInVault, owner, repo, branch, path }) {
   const detected = detectRepo();
   config = {
     ...config,
@@ -242,34 +253,52 @@ export async function createVault({ passphrase, token, tokenInVault, owner, repo
     path: path || config.path,
     tokenInVault: Boolean(tokenInVault),
   };
-  session.passphrase = passphrase;
+  session.key = crypto.generateKey();
   session.token = token;
 
   const existing = await fetchVault();
   if (existing.vault) {
     throw new Error(
-      'A shared list already exists in this repo. Use “Join the shared list” with its passphrase instead.',
+      'A shared list already exists in this repo. Open it with its invite link instead, or rotate its key from a device that already has access.',
     );
   }
 
-  const vault = await crypto.seal(buildPayload(), passphrase);
+  const vault = await crypto.seal(buildPayload(), session.key);
   const result = await putVault(vault, null, 'chore: create shared list');
-  if (result.conflict) throw new Error('Someone created the shared list at the same moment. Reload and join it.');
+  if (result.conflict) {
+    throw new Error('Someone created the shared list at the same moment. Reload and open it with their link.');
+  }
 
   lastVault = vault;
   lastSha = result.sha;
-  config.passphrase = passphrase;
+  config.key = session.key;
   config.token = token;
   config.lastSync = new Date().toISOString();
   saveConfig();
   status.lastSync = config.lastSync;
   setStatus('ok', 'Shared list created');
   startPolling();
-  return true;
+  return inviteLink();
 }
 
-/** Unlock an existing shared list with the passphrase. */
-export async function unlock({ passphrase, token, owner, repo, branch, path, remember = true }) {
+/** Accept a key pulled out of an invite link, or pasted by hand. */
+export function extractKey(input) {
+  const text = String(input ?? '').trim();
+  if (!text) return null;
+  if (crypto.isValidKey(text)) return text;
+  // Tolerate a whole invite link, with the key in the fragment or the query.
+  const match = /[?&#]k=([A-Za-z0-9_-]{43})/.exec(text);
+  return match && crypto.isValidKey(match[1]) ? match[1] : null;
+}
+
+/**
+ * Open an existing shared list with its key.
+ *
+ * `passphrase` is only for upgrading a vault written by the older
+ * passphrase-based version; such a vault is re-keyed to a generated key on
+ * open, and the new invite link is returned.
+ */
+export async function unlock({ key, token, passphrase, owner, repo, branch, path, remember = true }) {
   const detected = detectRepo();
   config = {
     ...config,
@@ -280,7 +309,6 @@ export async function unlock({ passphrase, token, owner, repo, branch, path, rem
     path: path || config.path,
     remember,
   };
-  session.passphrase = passphrase;
   if (token) session.token = token;
 
   setStatus('syncing', 'Opening the shared list…');
@@ -290,24 +318,73 @@ export async function unlock({ passphrase, token, owner, repo, branch, path, rem
     throw new Error('There is no shared list in this repo yet. Create one instead.');
   }
 
-  const payload = await crypto.open(vault, passphrase);
+  const legacy = crypto.isLegacyVault(vault);
+  const candidate = legacy ? null : extractKey(key);
+  if (!legacy && !candidate) {
+    setStatus('error', 'That key is not valid.');
+    throw new Error('That does not look like a list key or an invite link.');
+  }
+
+  const payload = await crypto.open(vault, { key: candidate, passphrase });
+  session.key = candidate;
   absorb(payload);
 
   lastVault = vault;
   lastSha = sha;
-  config.passphrase = remember ? passphrase : null;
-  config.token = remember ? session.token : null;
   config.lastSync = new Date().toISOString();
+
+  if (legacy) {
+    // Replace the passphrase-derived vault with a generated key, once.
+    session.key = crypto.generateKey();
+    const upgraded = await crypto.seal(buildPayload(), session.key);
+    const result = await putVault(upgraded, sha, 'chore: re-key shared list');
+    if (!result.conflict) {
+      lastVault = upgraded;
+      lastSha = result.sha;
+    }
+  }
+
+  config.key = remember ? session.key : null;
+  config.token = remember ? session.token : null;
   saveConfig();
   status.lastSync = config.lastSync;
   setStatus(writeToken() ? 'ok' : 'readonly', writeToken() ? 'In sync' : 'Read-only — no token on this device');
   startPolling();
-  return true;
+  return { upgraded: legacy, link: inviteLink() };
+}
+
+/**
+ * Re-encrypt under a brand new key. Every existing invite link stops working,
+ * which is the answer to a link that went somewhere it should not have.
+ */
+export async function rotateKey() {
+  if (!config.enabled || !session.key) throw new Error('The shared list is not open on this device.');
+  if (!writeToken()) throw new Error('Rotating the key needs write access, and this device has no token.');
+
+  const { vault, sha } = await fetchVault();
+  if (!vault) throw new Error('The shared list file is missing from the repo.');
+
+  // Merge in anything outstanding first, so rotation never drops an edit.
+  absorb(await crypto.open(vault, { key: session.key }));
+
+  session.key = crypto.generateKey();
+  const sealed = await crypto.seal(buildPayload(), session.key);
+  const result = await putVault(sealed, sha, 'chore: rotate shared list key');
+  if (result.conflict) throw new Error('The list changed mid-rotation. Try again.');
+
+  lastVault = sealed;
+  lastSha = result.sha;
+  config.key = config.remember ? session.key : null;
+  config.lastSync = new Date().toISOString();
+  saveConfig();
+  status.lastSync = config.lastSync;
+  setStatus('ok', 'Key rotated — old invite links no longer work');
+  return inviteLink();
 }
 
 /** Pull the latest shared state and merge it in. */
 export async function pull({ quiet = false } = {}) {
-  if (!config.enabled || !session.passphrase) return false;
+  if (!config.enabled || !session.key) return false;
   if (!quiet) setStatus('syncing', 'Checking for changes…');
 
   try {
@@ -321,7 +398,7 @@ export async function pull({ quiet = false } = {}) {
       return true;
     }
 
-    const payload = await crypto.open(vault, session.passphrase);
+    const payload = await crypto.open(vault, { key: session.key });
     absorb(payload);
     lastVault = vault;
     lastSha = sha;
@@ -341,7 +418,7 @@ export async function pull({ quiet = false } = {}) {
  * made on another phone in the meantime is never dropped.
  */
 export async function push({ attempt = 0 } = {}) {
-  if (!config.enabled || !session.passphrase) return false;
+  if (!config.enabled || !session.key) return false;
   if (!writeToken()) {
     setStatus('readonly', 'Read-only — changes stay on this device');
     return false;
@@ -351,12 +428,12 @@ export async function push({ attempt = 0 } = {}) {
   try {
     const { vault, sha } = await fetchVault();
     if (vault && sha !== lastSha) {
-      const payload = await crypto.open(vault, session.passphrase);
+      const payload = await crypto.open(vault, { key: session.key });
       absorb(payload);
       lastSha = sha;
     }
 
-    const sealed = await crypto.seal(buildPayload(), session.passphrase, vault ?? lastVault);
+    const sealed = await crypto.seal(buildPayload(), session.key);
     const result = await putVault(sealed, sha, 'chore: update shared list');
 
     if (result.conflict) {
@@ -383,7 +460,7 @@ export async function push({ attempt = 0 } = {}) {
 /** Called on every local change; batches rapid edits into one commit. */
 export function schedulePush() {
   if (applyingRemote) return;
-  if (!config.enabled || !session.passphrase || !writeToken()) return;
+  if (!config.enabled || !session.key || !writeToken()) return;
   status.pending = true;
   clearTimeout(pushTimer);
   // Every save is a commit, so batch generously — checking a dozen items off
@@ -407,7 +484,7 @@ export function disconnect() {
   clearTimeout(pushTimer);
   clearInterval(pollTimer);
   config = defaults();
-  session = { passphrase: null, token: null, vaultToken: null };
+  session = { key: null, token: null, vaultToken: null };
   lastVault = null;
   lastSha = null;
   localStorage.removeItem(CONFIG_KEY);
@@ -415,7 +492,21 @@ export function disconnect() {
 }
 
 export function needsUnlock() {
-  return config.enabled && !session.passphrase;
+  return config.enabled && !session.key;
+}
+
+/**
+ * Adopt a key handed over in an invite link. Returns true when this is a key
+ * the device did not already have, so the caller knows to open the list.
+ */
+export function adoptKey(rawKey) {
+  const key = extractKey(rawKey);
+  if (!key || key === session.key) return false;
+  session.key = key;
+  config.enabled = true;
+  if (config.remember) config.key = key;
+  saveConfig();
+  return true;
 }
 
 // ── Polling ──────────────────────────────────────────────────────────────
@@ -430,7 +521,7 @@ function startPolling() {
 }
 
 document.addEventListener('visibilitychange', () => {
-  if (document.visibilityState === 'visible' && config.enabled && session.passphrase) {
+  if (document.visibilityState === 'visible' && config.enabled && session.key) {
     pull({ quiet: true });
   }
 });
@@ -438,8 +529,8 @@ document.addEventListener('visibilitychange', () => {
 /** Resume a session that was set up earlier on this device. */
 export async function resume() {
   if (!config.enabled) return false;
-  if (!session.passphrase) {
-    setStatus('locked', 'Enter the passphrase to open the shared list');
+  if (!session.key) {
+    setStatus('locked', 'Open the invite link, or paste the key, to see the shared list');
     return false;
   }
   const ok = await pull({ quiet: true });

@@ -1,25 +1,31 @@
 /**
- * Passphrase encryption for the shared list file.
+ * Encryption for the shared list file.
  *
  * The repo is public, so `data/vault.json` is readable by anyone. Everything
- * inside it is encrypted in the browser with a key derived from the household
- * passphrase — the passphrase itself is never sent anywhere, and there is no
- * server that could reveal it.
+ * inside it is encrypted in the browser with AES-256-GCM under a key that the
+ * app generates — 32 random bytes from the OS CSPRNG, never a passphrase
+ * anyone typed.
  *
- * AES-256-GCM for content (authenticated: a wrong passphrase fails to decrypt
- * rather than returning garbage), PBKDF2-HMAC-SHA-256 for key derivation.
+ * That distinction is the whole security argument. A human-invented phrase is
+ * worth maybe 30 bits, and the ciphertext here is public and permanent, so it
+ * can be attacked offline forever at no cost — hours of GPU time to break. A
+ * generated 256-bit key cannot be searched at all, at any budget, ever. The
+ * key travels as part of an invite link and is never sent to a server: URL
+ * fragments are not transmitted in HTTP requests.
  *
- * The honest limit of this design: the ciphertext is public and permanent, so
- * its security rests entirely on the passphrase being long and unguessable.
- * Anyone can take a copy and grind at it offline for as long as they like.
- * That is why setup insists on a real passphrase rather than a word.
+ * The trade this makes is explicit: possession of the link is possession of
+ * the list. Guard the link like a house key, and rotate it (Setup → Shared
+ * list → Rotate key) if it ever goes somewhere it shouldn't.
+ *
+ * Vault v1 used PBKDF2 over a passphrase. It is still readable here so nobody
+ * can be locked out of an early vault, and the app re-keys it to v2 on open.
  */
 
-const KDF_ITERATIONS = 600_000; // OWASP guidance for PBKDF2-HMAC-SHA256
-const SALT_BYTES = 16;
 const IV_BYTES = 12;
+const KEY_BYTES = 32;
+const V1_KDF_ITERATIONS = 600_000;
 
-export const VAULT_VERSION = 1;
+export const VAULT_VERSION = 2;
 
 function subtle() {
   if (!globalThis.crypto?.subtle) {
@@ -35,7 +41,7 @@ export function isSupported() {
   return Boolean(globalThis.crypto?.subtle);
 }
 
-// ── base64 ───────────────────────────────────────────────────────────────
+// ── Encoding ─────────────────────────────────────────────────────────────
 
 export function toBase64(bytes) {
   let bin = '';
@@ -48,9 +54,46 @@ export function fromBase64(text) {
   return Uint8Array.from(bin, (c) => c.charCodeAt(0));
 }
 
-// ── keys ─────────────────────────────────────────────────────────────────
+/** URL-safe, unpadded — the key has to survive being pasted into a link. */
+function toBase64Url(bytes) {
+  return toBase64(bytes).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
 
-async function deriveKey(passphrase, salt, iterations) {
+function fromBase64Url(text) {
+  return fromBase64(text.replace(/-/g, '+').replace(/_/g, '/'));
+}
+
+// ── Keys ─────────────────────────────────────────────────────────────────
+
+/** A fresh 256-bit key, as a 43-character URL-safe string. */
+export function generateKey() {
+  return toBase64Url(globalThis.crypto.getRandomValues(new Uint8Array(KEY_BYTES)));
+}
+
+export function isValidKey(value) {
+  if (typeof value !== 'string') return false;
+  const trimmed = value.trim();
+  if (!/^[A-Za-z0-9_-]{43}$/.test(trimmed)) return false;
+  try {
+    return fromBase64Url(trimmed).length === KEY_BYTES;
+  } catch {
+    return false;
+  }
+}
+
+async function importKey(keyString) {
+  const trimmed = String(keyString).trim();
+  if (!isValidKey(trimmed)) {
+    throw new Error('That is not a valid list key.');
+  }
+  return subtle().importKey('raw', fromBase64Url(trimmed), { name: 'AES-GCM' }, false, [
+    'encrypt',
+    'decrypt',
+  ]);
+}
+
+/** v1 only: derive a key from a passphrase, so old vaults can still be read. */
+async function deriveLegacyKey(passphrase, salt, iterations) {
   const material = await subtle().importKey(
     'raw',
     new TextEncoder().encode(passphrase),
@@ -59,60 +102,54 @@ async function deriveKey(passphrase, salt, iterations) {
     ['deriveKey'],
   );
   return subtle().deriveKey(
-    { name: 'PBKDF2', salt, iterations, hash: 'SHA-256' },
+    { name: 'PBKDF2', salt, iterations: iterations ?? V1_KDF_ITERATIONS, hash: 'SHA-256' },
     material,
     { name: 'AES-GCM', length: 256 },
     false,
-    ['encrypt', 'decrypt'],
+    ['decrypt'],
   );
 }
 
-// ── vault ────────────────────────────────────────────────────────────────
+// ── Vault ────────────────────────────────────────────────────────────────
 
-/**
- * Encrypt a payload into a vault envelope.
- *
- * Reuses the salt of an existing vault when given one, so unlocking stays a
- * single key derivation per session instead of one per save.
- */
-export async function seal(payload, passphrase, previous = null) {
-  const salt = previous?.kdf?.salt
-    ? fromBase64(previous.kdf.salt)
-    : globalThis.crypto.getRandomValues(new Uint8Array(SALT_BYTES));
-  const iterations = previous?.kdf?.iterations ?? KDF_ITERATIONS;
+export async function seal(payload, keyString) {
+  const key = await importKey(keyString);
   const iv = globalThis.crypto.getRandomValues(new Uint8Array(IV_BYTES));
-  const key = await deriveKey(passphrase, salt, iterations);
-
   const plaintext = new TextEncoder().encode(JSON.stringify(payload));
   const ciphertext = await subtle().encrypt({ name: 'AES-GCM', iv }, key, plaintext);
 
   return {
     version: VAULT_VERSION,
-    kdf: {
-      name: 'PBKDF2',
-      hash: 'SHA-256',
-      iterations,
-      salt: toBase64(salt),
-    },
     cipher: { name: 'AES-GCM', iv: toBase64(iv) },
     ciphertext: toBase64(ciphertext),
     updatedAt: new Date().toISOString(),
   };
 }
 
-export async function open(vault, passphrase) {
-  if (!vault?.ciphertext || !vault?.kdf?.salt || !vault?.cipher?.iv) {
+/**
+ * Decrypt a vault. Pass `{ key }` for v2, or `{ passphrase }` for a v1 vault.
+ * AES-GCM is authenticated, so the wrong key fails loudly rather than
+ * returning plausible nonsense.
+ */
+export async function open(vault, { key: keyString, passphrase } = {}) {
+  if (!vault?.ciphertext || !vault?.cipher?.iv) {
     throw new Error('That file is not a Shopping Pal vault.');
   }
   if (vault.version > VAULT_VERSION) {
     throw new Error('This vault was written by a newer version of the app.');
   }
 
-  const key = await deriveKey(
-    passphrase,
-    fromBase64(vault.kdf.salt),
-    vault.kdf.iterations,
-  );
+  let key;
+  if (isLegacyVault(vault)) {
+    if (!passphrase) {
+      throw new Error(
+        'This shared list was created by the older passphrase version. Enter its passphrase to open and upgrade it.',
+      );
+    }
+    key = await deriveLegacyKey(passphrase, fromBase64(vault.kdf.salt), vault.kdf.iterations);
+  } else {
+    key = await importKey(keyString);
+  }
 
   let plaintext;
   try {
@@ -122,62 +159,15 @@ export async function open(vault, passphrase) {
       fromBase64(vault.ciphertext),
     );
   } catch {
-    // GCM authentication failed — almost always the wrong passphrase.
-    throw new Error('Wrong passphrase.');
+    // GCM authentication failed: wrong key, or the file was tampered with.
+    throw new Error(
+      isLegacyVault(vault) ? 'Wrong passphrase.' : 'That key does not open this list.',
+    );
   }
 
   return JSON.parse(new TextDecoder().decode(plaintext));
 }
 
-// ── passphrase quality ───────────────────────────────────────────────────
-
-const COMMON = [
-  'password', 'passphrase', 'letmein', 'groceries', 'grocery', 'shopping',
-  'qwerty', 'welcome', 'iloveyou', 'admin', 'changeme', '123456', 'abc123',
-];
-
-/**
- * Rough strength check. The point is to block the passphrases that make an
- * offline attack on a public file trivial, not to score entropy precisely.
- */
-export function ratePassphrase(value) {
-  const text = value.trim();
-  const lower = text.toLowerCase();
-  const words = text.split(/\s+/).filter(Boolean);
-
-  if (text.length < 12) {
-    return { ok: false, level: 'weak', message: 'Use at least 12 characters.' };
-  }
-  if (COMMON.some((c) => lower.includes(c))) {
-    return {
-      ok: false,
-      level: 'weak',
-      message: 'Contains a very common word — an attacker tries these first.',
-    };
-  }
-  if (/^(.)\1+$/.test(text)) {
-    return { ok: false, level: 'weak', message: 'That is a single repeated character.' };
-  }
-
-  const variety =
-    (/[a-z]/.test(text) ? 1 : 0) +
-    (/[A-Z]/.test(text) ? 1 : 0) +
-    (/[0-9]/.test(text) ? 1 : 0) +
-    (/[^a-zA-Z0-9]/.test(text) ? 1 : 0);
-
-  if (words.length >= 4 || (text.length >= 20 && variety >= 2)) {
-    return { ok: true, level: 'strong', message: 'Strong.' };
-  }
-  if (text.length >= 16 || variety >= 3) {
-    return {
-      ok: true,
-      level: 'fair',
-      message: 'Usable. Four random words would be stronger.',
-    };
-  }
-  return {
-    ok: false,
-    level: 'weak',
-    message: 'Too guessable. Try four random words, or add length and variety.',
-  };
+export function isLegacyVault(vault) {
+  return Boolean(vault?.kdf?.salt) && (vault.version ?? 1) < 2;
 }
