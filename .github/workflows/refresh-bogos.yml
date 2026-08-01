@@ -1,0 +1,50 @@
+name: Refresh Publix BOGOs
+
+on:
+  schedule:
+    # 11:00 UTC daily — early morning Eastern, after a new ad would be posted.
+    # Daily rather than weekly so a one-off failure self-heals the next day.
+    - cron: '0 11 * * *'
+  workflow_dispatch:
+    inputs:
+      store:
+        description: 'Publix store number (overrides the PUBLIX_STORE_NUMBER variable)'
+        required: false
+        type: string
+
+permissions:
+  contents: write
+
+concurrency:
+  group: refresh-bogos
+  cancel-in-progress: true
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      # The script never exits non-zero for an unreachable feed: it records the
+      # failed attempt in data/bogos.json and emits a CI warning, so a broken
+      # endpoint does not send a failure email every single morning.
+      - name: Fetch this week's BOGO deals
+        env:
+          PUBLIX_STORE_NUMBER: ${{ inputs.store || vars.PUBLIX_STORE_NUMBER }}
+        run: node scripts/fetch-publix-bogos.mjs --out data/bogos.json
+
+      - name: Commit if the feed changed
+        run: |
+          if git diff --quiet -- data/bogos.json; then
+            echo "No change to data/bogos.json"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/bogos.json
+          git commit -m "chore: refresh Publix BOGO feed"
+          git push

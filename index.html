@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>Shopping Pal</title>
+    <meta
+      name="description"
+      content="The weekly grocery list — sorted by the aisle you'll find it in, with Publix BOGOs and what you actually buy."
+    />
+    <meta name="theme-color" content="#12603d" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#11151a" media="(prefers-color-scheme: dark)" />
+    <meta name="color-scheme" content="light dark" />
+    <link rel="manifest" href="manifest.webmanifest" />
+    <link rel="icon" href="assets/icon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="assets/icon-180.png" />
+    <link rel="stylesheet" href="assets/css/app.css" />
+  </head>
+  <body>
+    <a class="visually-hidden" href="#app">Skip to the list</a>
+
+    <div class="utility">
+      <div class="shell utility__inner">
+        <span class="utility__dot" aria-hidden="true"></span>
+        <span>Household grocery list — saved on this device</span>
+        <span class="utility__spacer"></span>
+        <span id="sync-status"></span>
+        <span id="offline-note" hidden>Offline — everything still works</span>
+      </div>
+    </div>
+
+    <header class="masthead">
+      <div class="shell masthead__inner">
+        <div class="wordmark">
+          <span class="wordmark__mark" aria-hidden="true">SP</span>
+          <div class="wordmark__text">
+            <h1>Shopping&nbsp;Pal</h1>
+            <p>Weekly list &amp; store route</p>
+          </div>
+        </div>
+        <div class="masthead__status">
+          <div class="progress" id="list-status"></div>
+        </div>
+      </div>
+    </header>
+
+    <nav class="nav" aria-label="Sections">
+      <div class="shell nav__inner" id="nav"></div>
+    </nav>
+
+    <main class="shell" id="app" tabindex="-1"></main>
+
+    <footer class="site-footer">
+      <div class="shell">
+        <p>
+          Built for one household. Everything is stored in this browser — export a
+          backup from <strong>Setup</strong> to move it to another phone.
+          BOGO deals are refreshed by a scheduled job and may lag the ad in store;
+          the aisle route is a starting layout you can correct as you shop.
+        </p>
+      </div>
+    </footer>
+
+    <div id="toast-host" aria-live="polite"></div>
+
+    <script type="module" src="assets/js/app.js"></script>
+    <script>
+      // Tiny non-module helper so the offline flag works even if modules fail.
+      (function () {
+        var note = document.getElementById('offline-note');
+        function sync() {
+          note.hidden = navigator.onLine;
+        }
+        window.addEventListener('online', sync);
+        window.addEventListener('offline', sync);
+        sync();
+      })();
+    </script>
+  </body>
+</html>
