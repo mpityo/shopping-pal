@@ -12,8 +12,11 @@ on:
         required: false
         type: string
 
+# Pages needs write + id-token, on top of contents:write for the feed commit.
 permissions:
   contents: write
+  pages: write
+  id-token: write
 
 concurrency:
   group: refresh-bogos
@@ -22,6 +25,10 @@ concurrency:
 jobs:
   refresh:
     runs-on: ubuntu-latest
+    # This job publishes the site itself (see the deploy step below), so it has
+    # to declare the Pages environment.
+    environment:
+      name: github-pages
     steps:
       - uses: actions/checkout@v4
 
@@ -38,9 +45,11 @@ jobs:
         run: node scripts/fetch-publix-bogos.mjs --out data/bogos.json
 
       - name: Commit if the feed changed
+        id: commit
         run: |
           if git diff --quiet -- data/bogos.json; then
             echo "No change to data/bogos.json"
+            echo "changed=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
           git config user.name "github-actions[bot]"
@@ -48,3 +57,22 @@ jobs:
           git add data/bogos.json
           git commit -m "chore: refresh Publix BOGO feed"
           git push
+          echo "changed=true" >> "$GITHUB_OUTPUT"
+
+      # A push made with the default GITHUB_TOKEN deliberately does not trigger
+      # other workflows, so the Pages deploy never fires for the commit above.
+      # The site would keep serving the previous feed indefinitely. Publish
+      # from here instead, straight from the tree we just committed.
+      - name: Configure Pages
+        if: steps.commit.outputs.changed == 'true'
+        uses: actions/configure-pages@v5
+
+      - name: Upload site
+        if: steps.commit.outputs.changed == 'true'
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: .
+
+      - name: Publish the refreshed feed
+        if: steps.commit.outputs.changed == 'true'
+        uses: actions/deploy-pages@v4
