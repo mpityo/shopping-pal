@@ -1,11 +1,73 @@
 {
-  "status": "unavailable",
-  "updated": null,
-  "store": null,
-  "validThrough": null,
-  "source": null,
-  "lastAttempt": null,
-  "lastError": null,
-  "count": 0,
-  "deals": []
+  "status": "ok",
+  "updated": "2026-08-01T17:24:13.505Z",
+  "store": "Publix (no store set)",
+  "validThrough": "2026-08-04",
+  "source": "https://services.publix.com/api/v4/savings?promotionType=BOGO&pageSize=200&page=1",
+  "count": 9,
+  "deals": [
+    {
+      "id": "67825b55-e140-46ad-9e47-49b3e6d18fd6",
+      "title": "Buy any ONE (1) Coca-Cola 20oz Soft Drinks and Get ONE (1) Dasani 20oz or smartwater 20oz FREE",
+      "brand": "Coca Cola, Dasani, Smartwater",
+      "category": null,
+      "savings": "Free with purchase"
+    },
+    {
+      "id": "f33f3c52-2845-4f0f-a948-2b2109c15ce1",
+      "title": "SAVE $1.00 on Annie&#39;s&trade;",
+      "brand": "Annie&#39;s",
+      "category": null,
+      "savings": "Save $1.00"
+    },
+    {
+      "id": "387a113c-7bbb-470f-9ade-0a47df0e4e71",
+      "title": "SAVE 50&cent; on Betty Crocker&trade;",
+      "brand": "Betty Crocker",
+      "category": null,
+      "savings": "Save $0.50"
+    },
+    {
+      "id": "4458e516-8340-4cd1-a75d-c6083e1b7dce",
+      "title": "Buy any ONE (1) Core Power 26g/42g 14oz, Get any ONE (1) BODYARMOR Flash IV 20oz FREE",
+      "brand": "BODYARMOR",
+      "category": null,
+      "savings": "Free with purchase"
+    },
+    {
+      "id": "ecd7973f-287a-44b9-aec0-dc43467b3a29",
+      "title": "Buy any ONE (1) King&rsquo;s Hawaiian&reg; Pretzel Bites and Get ONE (1) Publix Jalape&ntilde;o Popper Dip for FREE",
+      "brand": "King&#39;s Hawaiian",
+      "category": null,
+      "savings": "Free with purchase"
+    },
+    {
+      "id": "5ddcf729-1807-4454-a704-90f367fe640a",
+      "title": "Buy any ONE (1) MOUNTAIN DEW 20-oz and Get ONE (1) TROLLI 7.2-oz or less bag FREE",
+      "brand": "Mountain Dew, Trolli",
+      "category": null,
+      "savings": "Free with purchase"
+    },
+    {
+      "id": "e6bf6680-5b62-4132-9a3d-c4bd7fb143b3",
+      "title": "Buy ONE (1) PEPSI 10pk 7.5 oz and Get ONE (1) DORITOS, CHEETOS, SUN CHIPS or FUNYUNS 2.88-5.125-oz FREE",
+      "brand": "PEPSI-COLA, DORITOS, CHEETOS, SUN CHIPS or FUNYUNS",
+      "category": null,
+      "savings": "Free with purchase"
+    },
+    {
+      "id": "8c22f50d-3bad-4981-b560-7a5afa90f423",
+      "title": "Buy ONE (1) PEPSI 20-oz and Get ONE (1) LAY&#39;S Single Bag 1.875-3.625-oz Free",
+      "brand": "PEPSI-COLA, LAY&#39;S",
+      "category": null,
+      "savings": "Free with purchase"
+    },
+    {
+      "id": "742c77d6-4b44-44f6-8733-a9fb70ac1a0d",
+      "title": "Buy ONE (1) STARBUCKS Coffee &amp; Protein 12 oz and Get ONE (1) QUACKER Instant Oatmeal Cup Free",
+      "brand": "STARBUCKS, QUAKER OATMEAL",
+      "category": null,
+      "savings": "Free with purchase"
+    }
+  ]
 }
