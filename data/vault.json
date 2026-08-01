@@ -1,0 +1,9 @@
+{
+  "version": 2,
+  "cipher": {
+    "name": "AES-GCM",
+    "iv": "BnMDsJ1wIGHrlbhC"
+  },
+  "ciphertext": "vakJDcS+ZV3m8IPxRPvo28OyrC766fZh0zfd6PvEVe0akRl/xI0d2woB6jKcnrQxbmgY4vi165ENJXU3t9Gv6CuJBkEFXvgB3GoBieVhuJkv4zXoSd6qnXLuVVUnB3cmPewxOXfjAAsp1peSoO5rRa6qbeM0kJcHynepPWZUPbkA1X0oZW3QZkcFu/oT2UhTIrHSwnzcmFXqPJMOp7lPw7dgk0fdljzlZduXVqrwRJBnC6g8p+a0Tyf4L4JmOjuZA6NYiKEWJwFv03nvb/BmXuSUX2KZLMFkPxvySjnOXH1t3q4EzI2+iIjjeyoVqcjDQKY5NAoSGdY21k+BG7qRpLNNg9aJKp7FzrJtOMwDd1GW1s4HOEXksr5mD1sdw6adrioLOWSTBHvTjgHfAQgJlC5RwtYjvGmhZGETfYD6L8fQM3ubOkqpK39wIzWkW6YJCJork3vUjY949i0FTzo0rSulTm/4M5a2GSb9i6ea6MKKyw1KZMdflCg4FXSI2PIR3Sbkosq26Jl4UkwSIZxN",
+  "updatedAt": "2026-08-01T17:28:09.447Z"
+}
