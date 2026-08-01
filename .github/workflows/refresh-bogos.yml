@@ -11,6 +11,11 @@ on:
         description: 'Publix store number (overrides the PUBLIX_STORE_NUMBER variable)'
         required: false
         type: string
+      discover:
+        description: 'Probe Publix endpoints and report what each returns, without changing the feed'
+        required: false
+        default: false
+        type: boolean
 
 # Pages needs write + id-token, on top of contents:write for the feed commit.
 permissions:
@@ -36,16 +41,27 @@ jobs:
         with:
           node-version: '20'
 
+      # Read-only reconnaissance: reports what every candidate endpoint returns
+      # so the right one can be picked out of a single log, instead of one
+      # guess per CI round trip. Writes nothing and deploys nothing.
+      - name: Probe Publix endpoints
+        if: ${{ inputs.discover }}
+        env:
+          PUBLIX_STORE_NUMBER: ${{ inputs.store || vars.PUBLIX_STORE_NUMBER }}
+        run: node scripts/fetch-publix-bogos.mjs --discover
+
       # The script never exits non-zero for an unreachable feed: it records the
       # failed attempt in data/bogos.json and emits a CI warning, so a broken
       # endpoint does not send a failure email every single morning.
       - name: Fetch this week's BOGO deals
+        if: ${{ !inputs.discover }}
         env:
           PUBLIX_STORE_NUMBER: ${{ inputs.store || vars.PUBLIX_STORE_NUMBER }}
         run: node scripts/fetch-publix-bogos.mjs --out data/bogos.json
 
       - name: Commit if the feed changed
         id: commit
+        if: ${{ !inputs.discover }}
         run: |
           if git diff --quiet -- data/bogos.json; then
             echo "No change to data/bogos.json"

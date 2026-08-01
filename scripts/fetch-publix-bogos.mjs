@@ -30,6 +30,58 @@ const UA =
   'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 ' +
   '(KHTML, like Gecko) Chrome/126.0 Safari/537.36';
 
+/**
+ * Probe list for `--discover`.
+ *
+ * The one endpoint that answers ignores `promotionType` and returns the whole
+ * digital-coupon gallery, and its rows carry a `waId` (weekly-ad id) next to
+ * `dcId` (digital-coupon id) — so the weekly ad is plausibly reachable from
+ * the same service under different parameters. Guessing one URL per CI run is
+ * slow; this tries the lot in a single run and reports what each returns, so
+ * the working combination can be picked out of one log.
+ */
+const PROBES = [
+  ['v4 savings, no filter', (s) => `https://services.publix.com/api/v4/savings?pageSize=500&page=1${q(s)}`],
+  ['v4 savings, weeklyad type', (s) => `https://services.publix.com/api/v4/savings?promotionType=WeeklyAd&pageSize=500${q(s)}`],
+  ['v4 savings, savingsType', (s) => `https://services.publix.com/api/v4/savings?savingsType=WeeklyAd&pageSize=500${q(s)}`],
+  ['v4 savings, BOGO+weeklyad', (s) => `https://services.publix.com/api/v4/savings?promotionType=BOGO&savingsType=WeeklyAd&pageSize=500${q(s)}`],
+  ['v4 weeklyad', (s) => `https://services.publix.com/api/v4/weeklyad?pageSize=500${q(s)}`],
+  ['v4 weeklyad items', (s) => `https://services.publix.com/api/v4/weeklyad/items?pageSize=500${q(s)}`],
+  ['v4 savings/weeklyad', (s) => `https://services.publix.com/api/v4/savings/weeklyad?pageSize=500${q(s)}`],
+  ['v3 savings', (s) => `https://services.publix.com/api/v3/savings?pageSize=500${q(s)}`],
+  ['v2 weeklyad', (s) => `https://services.publix.com/api/v2/weeklyad?pageSize=500${q(s)}`],
+  ['v1 weeklyads', (s) => `https://services.publix.com/api/v1/weeklyads${q(s, '?')}`],
+  ['v4 savings page 2', (s) => `https://services.publix.com/api/v4/savings?pageSize=500&page=2${q(s)}`],
+];
+
+function q(store, lead = '&') {
+  return store ? `${lead}storeNumber=${encodeURIComponent(store)}` : '';
+}
+
+/**
+ * Try every probe and report what came back, without writing the feed.
+ * Read the Action log, pick the endpoint that carries the weekly ad, and move
+ * it into CANDIDATES.
+ */
+async function discover() {
+  log(`discovery mode${STORE ? ` for store #${STORE}` : ' (no store number set!)'}`);
+  for (const [name, build] of PROBES) {
+    const url = build(STORE);
+    try {
+      const json = await getJson(url);
+      const { deals, report } = normalise(json);
+      log(`\n${name}`);
+      log(`  ${url}`);
+      describe(name, report);
+      log(`  would yield ${deals.length} BOGO deal(s)`);
+      for (const d of deals.slice(0, 3)) log(`  sample: ${d.title.slice(0, 88)}`);
+    } catch (err) {
+      log(`\n${name}\n  ${url}\n  → ${err.message}`);
+    }
+  }
+  log('\nDiscovery complete. Move the endpoint carrying the weekly ad into CANDIDATES.');
+}
+
 /** Tried in order; the first one that yields deals wins. */
 const CANDIDATES = [
   {
@@ -53,6 +105,11 @@ const CANDIDATES = [
 ];
 
 async function main() {
+  if (args.discover) {
+    await discover();
+    return;
+  }
+
   if (args.fixture) {
     const raw = await readFile(resolve(args.fixture), 'utf8');
     const { deals, report } = normalise(JSON.parse(raw));
@@ -111,7 +168,13 @@ function describe(name, report) {
     `  ${name}: ${report.rows} rows | ${report.textBogo} read as BOGO | ` +
       `${report.typedBogo} typed BOGO`,
   );
-  if (report.keys.length) log(`  fields: ${report.keys.slice(0, 14).join(', ')}`);
+  if (report.keys.length) log(`  fields: ${report.keys.slice(0, 16).join(', ')}`);
+  if (report.withCouponId || report.withWeeklyAdId) {
+    log(`  ids: ${report.withCouponId} digital-coupon, ${report.withWeeklyAdId} weekly-ad`);
+  }
+  if (report.qualifiers?.length) {
+    log(`  priceQualifier: ${report.qualifiers.map(([q, n]) => `${q}×${n}`).join(', ')}`);
+  }
   for (const title of report.skipped) log(`  skipped (not a BOGO): ${title.slice(0, 90)}`);
 }
 
@@ -147,7 +210,11 @@ async function getJson(url) {
 const TITLE_KEYS = ['title', 'name', 'productName', 'description', 'displayName', 'itemName'];
 const BRAND_KEYS = ['brand', 'brandName', 'manufacturer'];
 const CATEGORY_KEYS = ['category', 'categoryName', 'department', 'aisle', 'productCategory'];
-const SAVINGS_KEYS = ['savings', 'savingsText', 'promotionText', 'offerText', 'dealText', 'price', 'subtitle'];
+const SAVINGS_KEYS = [
+  'savings', 'savingsText', 'promotionText', 'offerText', 'dealText',
+  'priceQualifier', 'finalPrice', 'price', 'subtitle',
+];
+const DETAIL_KEYS = ['description', 'priceQualifier', 'terms', 'additionalSavings'];
 const ID_KEYS = ['id', 'promotionId', 'itemId', 'productId', 'sku'];
 
 /** Depth-first walk collecting every array of objects in the payload. */
@@ -223,7 +290,12 @@ function hasBogoType(obj) {
 
 function rowText(row) {
   return decodeEntities(
-    [pick(row, TITLE_KEYS), pick(row, SAVINGS_KEYS), pick(row, BRAND_KEYS)]
+    [
+      pick(row, TITLE_KEYS),
+      pick(row, SAVINGS_KEYS),
+      pick(row, BRAND_KEYS),
+      pick(row, DETAIL_KEYS),
+    ]
       .filter(Boolean)
       .join(' '),
   );
@@ -252,6 +324,24 @@ function normalise(payload) {
   const rows = scored[0].arr;
   report.rows = rows.length;
   report.keys = Object.keys(rows[0] ?? {});
+
+  // Publix tags rows with a digital-coupon id or a weekly-ad id. Knowing which
+  // family came back is the difference between "the coupon gallery" and "the
+  // weekly ad", and the counts say so at a glance.
+  const has = (row, key) => {
+    const found = Object.keys(row).find((k) => k.toLowerCase() === key);
+    const value = found ? row[found] : null;
+    return value !== null && value !== undefined && value !== '' && value !== 0;
+  };
+  report.withCouponId = rows.filter((r) => has(r, 'dcid')).length;
+  report.withWeeklyAdId = rows.filter((r) => has(r, 'waid')).length;
+
+  const qualifiers = new Map();
+  for (const row of rows) {
+    const q = pick(row, ['priceQualifier']) ?? '(none)';
+    qualifiers.set(q, (qualifiers.get(q) ?? 0) + 1);
+  }
+  report.qualifiers = [...qualifiers.entries()].sort((a, b) => b[1] - a[1]).slice(0, 8);
 
   const textBogo = rows.filter((r) => isBogoText(rowText(r)));
   const typedBogo = rows.filter(hasBogoType);
