@@ -55,33 +55,64 @@ const CANDIDATES = [
 async function main() {
   if (args.fixture) {
     const raw = await readFile(resolve(args.fixture), 'utf8');
-    const deals = normalise(JSON.parse(raw));
+    const { deals, report } = normalise(JSON.parse(raw));
+    describe('fixture', report);
     await publish(deals, `fixture:${args.fixture}`);
     return;
   }
 
-  const failures = [];
+  if (!STORE) {
+    log(
+      'WARNING: no store number set. The weekly-ad BOGOs are per-store, so ' +
+        'without one this may only return national offers. Set a repository ' +
+        'variable PUBLIX_STORE_NUMBER (Settings → Secrets and variables → ' +
+        'Actions → Variables).',
+    );
+    console.log('::warning title=No Publix store number::Set the PUBLIX_STORE_NUMBER repository variable for store-specific BOGOs.');
+  }
 
+  const failures = [];
+  const results = [];
+
+  // Try every candidate rather than stopping at the first that returns JSON:
+  // several of them answer, and the one that answers first is not necessarily
+  // the one carrying the weekly ad.
   for (const candidate of CANDIDATES) {
     const url = candidate.url(STORE);
     try {
       log(`trying ${candidate.name}: ${url}`);
       const json = await getJson(url);
-      const deals = normalise(json);
-      if (deals.length) {
-        log(`  → ${deals.length} deals`);
-        await publish(deals, url);
-        return;
-      }
-      failures.push(`${candidate.name}: 0 deals parsed`);
-      log('  → parsed 0 deals, trying the next candidate');
+      const { deals, report } = normalise(json);
+      describe(candidate.name, report);
+      if (deals.length) results.push({ deals, url, name: candidate.name });
+      else failures.push(`${candidate.name}: reached it, but no BOGO rows`);
     } catch (err) {
       failures.push(`${candidate.name}: ${err.message}`);
       log(`  → ${err.message}`);
     }
   }
 
+  if (results.length) {
+    results.sort((a, b) => b.deals.length - a.deals.length);
+    const best = results[0];
+    if (results.length > 1) {
+      log(`picked ${best.name} (${best.deals.length} deals) over ${results.length - 1} other source(s)`);
+    }
+    await publish(best.deals, best.url);
+    return;
+  }
+
   await recordFailure(failures);
+}
+
+/** Print what a payload actually looked like, so the log is diagnostic. */
+function describe(name, report) {
+  log(
+    `  ${name}: ${report.rows} rows | ${report.textBogo} read as BOGO | ` +
+      `${report.typedBogo} typed BOGO`,
+  );
+  if (report.keys.length) log(`  fields: ${report.keys.slice(0, 14).join(', ')}`);
+  for (const title of report.skipped) log(`  skipped (not a BOGO): ${title.slice(0, 90)}`);
 }
 
 // ── HTTP ─────────────────────────────────────────────────────────────────
@@ -141,44 +172,112 @@ function pick(obj, keys) {
   return null;
 }
 
-function looksLikeBogo(obj) {
-  const blob = JSON.stringify(obj).toLowerCase();
-  return (
-    blob.includes('bogo') ||
-    blob.includes('buy one') ||
-    blob.includes('buy 1') ||
-    blob.includes('get one free') ||
-    blob.includes('b1g1')
+/**
+ * Publix returns product text with HTML entities baked in ("Annie&#39;s",
+ * "Jalape&ntilde;o", "&trade;"). There is no DOM in Node to decode them, so
+ * handle numeric escapes plus the named ones that actually turn up in grocery
+ * copy.
+ */
+const NAMED_ENTITIES = {
+  amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", nbsp: ' ',
+  rsquo: '\u2019', lsquo: '\u2018', rdquo: '\u201d', ldquo: '\u201c',
+  ndash: '\u2013', mdash: '\u2014', hellip: '\u2026',
+  trade: '\u2122', reg: '\u00ae', copy: '\u00a9',
+  cent: '\u00a2', pound: '\u00a3', euro: '\u20ac', deg: '\u00b0',
+  frac12: '\u00bd', frac14: '\u00bc', frac34: '\u00be',
+  ntilde: '\u00f1', eacute: '\u00e9', egrave: '\u00e8', agrave: '\u00e0',
+  ccedil: '\u00e7', uuml: '\u00fc', ouml: '\u00f6', auml: '\u00e4',
+};
+
+function decodeEntities(text) {
+  if (typeof text !== 'string' || !text.includes('&')) return text;
+  return text
+    .replace(/&#x([0-9a-f]+);/gi, (_, hex) => String.fromCodePoint(parseInt(hex, 16)))
+    .replace(/&#(\d+);/g, (_, dec) => String.fromCodePoint(Number(dec)))
+    .replace(/&([a-z0-9]+);/gi, (match, name) => NAMED_ENTITIES[name.toLowerCase()] ?? match)
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+/**
+ * Does this row describe an actual buy-one-get-one, judged from its own text?
+ *
+ * Publix phrases these as "Buy any ONE (1) X ... Get ONE (1) Y FREE", so a
+ * naive `includes('buy one')` misses them, and a whole-object substring match
+ * is worse: querying promotionType=BOGO makes every row echo the word "bogo"
+ * somewhere, which let plain "SAVE $1.00" coupons through as BOGOs.
+ */
+function isBogoText(text) {
+  const t = text.toLowerCase();
+  if (/\bbogo\b|\bb1g1\b|buy\s*1\s*get\s*1/.test(t)) return true;
+  // "buy ... free" in that order covers the long-form phrasing.
+  return /\bbuy\b/.test(t) && /\bfree\b/.test(t);
+}
+
+/** A field whose value is literally a BOGO promotion type. */
+function hasBogoType(obj) {
+  return Object.values(obj).some(
+    (v) => typeof v === 'string' && /^(bogo|b1g1|buyonegetone|buy one get one( free)?)$/i.test(v.trim()),
   );
 }
 
+function rowText(row) {
+  return decodeEntities(
+    [pick(row, TITLE_KEYS), pick(row, SAVINGS_KEYS), pick(row, BRAND_KEYS)]
+      .filter(Boolean)
+      .join(' '),
+  );
+}
+
+/**
+ * Turn an arbitrary payload into deals, and report enough about what was seen
+ * for the Action log to be diagnostic when the shape changes again.
+ */
 function normalise(payload) {
   const arrays = collectArrays(payload);
-  if (!arrays.length) return [];
+  const report = { rows: 0, textBogo: 0, typedBogo: 0, skipped: [], keys: [] };
+  if (!arrays.length) return { deals: [], report };
 
   // Prefer the array whose entries most often carry a usable title.
   const scored = arrays
     .map((arr) => {
       const objs = arr.filter((v) => v && typeof v === 'object' && !Array.isArray(v));
-      const titled = objs.filter((o) => pick(o, TITLE_KEYS));
-      return { arr: objs, score: titled.length };
+      return { arr: objs, score: objs.filter((o) => pick(o, TITLE_KEYS)).length };
     })
     .filter((c) => c.score > 0)
     .sort((a, b) => b.score - a.score);
 
-  if (!scored.length) return [];
+  if (!scored.length) return { deals: [], report };
 
   const rows = scored[0].arr;
-  // If the payload mixes promo types, keep only the BOGO-looking rows — but if
-  // none of them say BOGO, assume the endpoint already filtered for us.
-  const bogoRows = rows.filter(looksLikeBogo);
-  const source = bogoRows.length ? bogoRows : rows;
+  report.rows = rows.length;
+  report.keys = Object.keys(rows[0] ?? {});
+
+  const textBogo = rows.filter((r) => isBogoText(rowText(r)));
+  const typedBogo = rows.filter(hasBogoType);
+  report.textBogo = textBogo.length;
+  report.typedBogo = typedBogo.length;
+
+  // Trust the row's own wording first. Only fall back to the API's labelling
+  // when nothing reads like a BOGO, and never fall back to "everything".
+  let source = textBogo;
+  if (!source.length && typedBogo.length) {
+    log('  no row text reads as BOGO; trusting the feed\'s own promotion type');
+    source = typedBogo;
+  }
+
+  const kept = new Set(source);
+  for (const row of rows) {
+    if (kept.has(row)) continue;
+    const title = decodeEntities(pick(row, TITLE_KEYS) ?? '');
+    if (title && report.skipped.length < 5) report.skipped.push(title);
+  }
 
   const deals = [];
   const seen = new Set();
 
   for (const row of source) {
-    const title = pick(row, TITLE_KEYS);
+    const title = decodeEntities(pick(row, TITLE_KEYS) ?? '');
     if (!title || title.length > 200) continue;
     const key = title.toLowerCase();
     if (seen.has(key)) continue;
@@ -187,13 +286,13 @@ function normalise(payload) {
     deals.push({
       id: pick(row, ID_KEYS) ?? key.replace(/[^a-z0-9]+/g, '-').slice(0, 60),
       title,
-      brand: pick(row, BRAND_KEYS),
-      category: pick(row, CATEGORY_KEYS),
-      savings: pick(row, SAVINGS_KEYS),
+      brand: decodeEntities(pick(row, BRAND_KEYS) ?? '') || null,
+      category: decodeEntities(pick(row, CATEGORY_KEYS) ?? '') || null,
+      savings: decodeEntities(pick(row, SAVINGS_KEYS) ?? '') || null,
     });
   }
 
-  return deals;
+  return { deals, report };
 }
 
 // ── Output ───────────────────────────────────────────────────────────────
@@ -204,6 +303,7 @@ async function publish(deals, source) {
     status: 'ok',
     updated: now.toISOString(),
     store: STORE ? `Publix store #${STORE}` : 'Publix (no store set)',
+    storeNumber: STORE || null,
     validThrough: nextWednesday(now),
     source,
     count: deals.length,

@@ -220,6 +220,7 @@ function feedStatus(feed, state) {
       ]
         .filter(Boolean)
         .join(' '),
+      !feed.storeNumber ? noStoreNotice() : null,
     );
   }
 
@@ -239,6 +240,19 @@ function feedStatus(feed, state) {
     h('strong', {}, 'No BOGO feed yet'),
     'Nothing has been published to data/bogos.json. The “Refresh Publix BOGOs” workflow writes that file; until it succeeds, deals can be added by hand and everything else here still works.',
     lastAttemptLine(feed),
+  );
+}
+
+/**
+ * The weekly ad is per-store. Without a store number Publix answers with
+ * national offers, which look nothing like the BOGOs on the shelf.
+ */
+function noStoreNotice() {
+  return h(
+    'p',
+    { class: 'dept-note', style: { marginTop: '0.5rem', marginBottom: 0 } },
+    'No store number is set, so these are Publix\u2019s national offers rather than your store\u2019s weekly ad. ' +
+      'Set a PUBLIX_STORE_NUMBER repository variable and re-run the refresh workflow.',
   );
 }
 

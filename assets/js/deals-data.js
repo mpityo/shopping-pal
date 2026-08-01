@@ -17,6 +17,7 @@ const EMPTY = {
   status: 'unavailable',
   updated: null,
   store: null,
+  storeNumber: null,
   validThrough: null,
   source: null,
   lastAttempt: null,
@@ -77,6 +78,14 @@ const WEAK_ALONE = new Set([
   'paper', 'plastic', 'pasta', 'sauce', 'mix', 'powder', 'spray', 'wipes',
   'bag', 'bags', 'towel', 'towels', 'cup', 'cups', 'roll', 'rolls', 'bar',
   'bars', 'sliced', 'ground', 'frozen', 'cooked', 'light', 'whole',
+  // Category nouns that appear in half the ad. Real matches share more than
+  // one word anyway — "Tostitos Tortilla Chips" still hits "tortilla chips" —
+  // whereas alone these turned "DORITOS, CHEETOS or SUN CHIPS" into a match
+  // for blue corn tortilla chips, and "Starbucks Coffee & Protein" into one
+  // for protein salad mix.
+  'chips', 'protein', 'coffee', 'juice', 'milk', 'cheese', 'bread', 'water',
+  'snack', 'snacks', 'oatmeal', 'instant', 'single', 'drink', 'drinks',
+  'soft', 'less', 'any',
 ]);
 
 function contentWords(text) {
