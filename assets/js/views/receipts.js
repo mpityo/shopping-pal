@@ -22,6 +22,7 @@ import {
 } from '../receipts.js';
 import * as ocr from '../ocr.js';
 import * as pdf from '../pdf.js';
+import * as ai from '../ai.js';
 
 const STORES = ['Publix', 'Walmart', 'Target', 'Aldi', 'Costco', 'Other'];
 
@@ -187,6 +188,7 @@ function openReview(ctx, parsed) {
   const summary = h('p', { class: 'dept-note' });
   const dupNotice = h('div', {});
   const tableBody = h('tbody', {});
+  const aiNotice = h('div', {});
 
   /**
    * Re-check the parsed lines against whatever is already recorded for the
@@ -285,8 +287,86 @@ function openReview(ctx, parsed) {
     if (row.status === 'enrich') return 'you checked this off — adding the price';
     if (row.confidence === 'alias') return 'learned previously';
     if (row.confidence === 'high') return 'matched';
+    if (row.confidence === 'ai-high') return 'read by Claude — worth a glance';
+    if (row.confidence === 'ai-low') return 'Claude’s best guess — please check';
     if (row.confidence === 'low') return 'unsure — please check';
     return 'no match — pick one';
+  }
+
+  /** Rows the fuzzy matcher could not place, and so worth spending a call on. */
+  function unresolved() {
+    return rows.map((row, index) => ({ row, index })).filter(({ row }) => !row.itemId);
+  }
+
+  /**
+   * Hand the leftovers to Claude.
+   *
+   * Only the lines the local matcher gave up on are sent, which is the whole
+   * economy of this: a receipt whose names already resolve costs nothing. What
+   * comes back is a suggestion in the same table as everything else — it is
+   * pre-selected, never auto-imported, and the row says where it came from so
+   * a wrong guess is obvious rather than silent.
+   */
+  async function askClaude() {
+    const pending = unresolved();
+    if (!pending.length) return;
+
+    aiNotice.replaceChildren(
+      h(
+        'div',
+        { class: 'notice' },
+        h('strong', {}, `Reading ${pluralize(pending.length, 'unmatched line')} with Claude…`),
+        'Only the line text and your catalog names are sent. Prices, totals and the receipt itself stay here.',
+      ),
+    );
+
+    try {
+      const suggestions = await ai.matchReceiptLines(
+        pending.map(({ row }) => row.line),
+        catalog,
+      );
+
+      let applied = 0;
+      suggestions.forEach((suggestion, offset) => {
+        const target = pending[offset];
+        if (!target) return;
+        target.row.itemId = suggestion.itemId;
+        target.row.confidence = suggestion.confidence === 'high' ? 'ai-high' : 'ai-low';
+        if (target.row.select) target.row.select.value = suggestion.itemId;
+        applied++;
+      });
+
+      aiNotice.replaceChildren(
+        applied
+          ? h(
+              'div',
+              { class: 'notice notice--deal' },
+              h(
+                'strong',
+                {},
+                `Claude matched ${applied} of ${pluralize(pending.length, 'unmatched line')}`,
+              ),
+              'Highlighted below. Check them before importing — a wrong match quietly skews every trend, and the ones you keep are remembered for next time.',
+            )
+          : h(
+              'div',
+              { class: 'notice' },
+              h('strong', {}, 'Claude could not place those lines either'),
+              'Pick them by hand below, or leave them out. Whatever you pick is remembered.',
+            ),
+      );
+
+      refreshDuplicates();
+    } catch (err) {
+      aiNotice.replaceChildren(
+        h(
+          'div',
+          { class: 'notice notice--warn' },
+          h('strong', {}, 'Claude could not be reached'),
+          `${err.message} Match the remaining lines by hand — nothing else is affected.`,
+        ),
+      );
+    }
   }
 
   function refreshSummary() {
@@ -335,6 +415,9 @@ function openReview(ctx, parsed) {
         ),
       ),
     );
+    // Kept so a suggestion arriving later can move the dropdown the user is
+    // already looking at.
+    row.select = select;
     return select;
   }
 
@@ -376,6 +459,7 @@ function openReview(ctx, parsed) {
   }
   refreshSummary();
   refreshDuplicates();
+  if (ai.hasKey() && store.getState().prefs.aiMatch !== false) askClaude();
 
   const reconcile =
     parsed.totalCents == null
@@ -413,6 +497,7 @@ function openReview(ctx, parsed) {
           )
         : null,
       reconcile,
+      aiNotice,
       dupNotice,
       h(
         'div',
@@ -463,7 +548,11 @@ function openReview(ctx, parsed) {
               }
               const learned = {};
               for (const row of kept) {
-                if (row.taught || row.confidence === 'high') {
+                // A confident match left untouched in this table has been
+                // confirmed by the person reading it, whether it came from the
+                // fuzzy matcher or from Claude. A hedged one has not, so it is
+                // used for this import but not remembered.
+                if (row.taught || row.confidence === 'high' || row.confidence === 'ai-high') {
                   learned[aliasKey(row.line.name)] = row.itemId;
                 }
               }

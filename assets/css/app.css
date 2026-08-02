@@ -1005,6 +1005,38 @@ textarea {
   margin-bottom: 0.15rem;
 }
 
+/* Prose read of the trends. Wider measure than the tables around it, since
+   this is the one place in the app you read sentences rather than scan. */
+.plain-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-width: 62ch;
+}
+
+.plain-list li {
+  position: relative;
+  padding-left: 1rem;
+  margin-bottom: 0.6rem;
+  font-size: 0.94rem;
+  line-height: 1.5;
+  color: var(--ink-2);
+}
+
+.plain-list li::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0.6em;
+  width: 5px;
+  height: 5px;
+  background: var(--brand);
+}
+
+.plain-list li:last-child {
+  margin-bottom: 0;
+}
+
 /* ── Modal & toast ─────────────────────────────────────────────────────── */
 
 .modal {

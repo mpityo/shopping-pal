@@ -1,6 +1,7 @@
 import { h, matchScore, modal, toast, pluralize } from '../util.js';
 import * as store from '../store.js';
 import { itemStats, relativeDays } from '../insights.js';
+import { departmentHint } from './ai-hints.js';
 
 let query = '';
 let filter = { type: 'all', value: null };
@@ -317,6 +318,16 @@ function openEditor(ctx, item, prefillName = '') {
     store.people().map((p) => h('option', { value: p.id, selected: item?.person === p.id }, p.name)),
   );
 
+  // Only for something new. An existing item already has a department someone
+  // chose, and second-guessing it would undo a deliberate correction.
+  const deptHint = isNew ? departmentHint(deptSelect) : { node: null, ask: () => {} };
+  if (isNew) {
+    if (prefillName) deptHint.ask(prefillName);
+    // The name is editable here, so re-ask once it settles.
+    nameInput.addEventListener('change', () => deptHint.ask(nameInput.value));
+    nameInput.addEventListener('blur', () => deptHint.ask(nameInput.value));
+  }
+
   const dialog = modal(
     isNew ? 'New item' : `Edit ${item.name}`,
     h(
@@ -350,6 +361,7 @@ function openEditor(ctx, item, prefillName = '') {
         h('label', { for: 'edit-dept' }, 'Department / aisle'),
         h('p', { class: 'hint' }, 'Sets where this appears on the shopping route.'),
         deptSelect,
+        deptHint.node,
       ),
       h(
         'div',
