@@ -22,6 +22,8 @@ const EMPTY = {
   source: null,
   lastAttempt: null,
   lastError: null,
+  /** Set when the refresh reached some sources but not others. */
+  partialError: null,
   deals: [],
 };
 

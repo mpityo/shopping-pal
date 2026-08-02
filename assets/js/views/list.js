@@ -276,6 +276,32 @@ function suggestions(ctx, entries) {
 
   if (!due.length && !deals.length) return null;
 
+  const open = state.prefs.suggestionsOpen === true;
+  const counts = [
+    due.length ? `${due.length} probably due` : null,
+    deals.length ? `${deals.length} on BOGO` : null,
+  ].filter(Boolean);
+
+  return h(
+    'div',
+    { class: 'disclosure' },
+    h(
+      'button',
+      {
+        class: 'disclosure__toggle',
+        type: 'button',
+        'aria-expanded': String(open),
+        onClick: () => store.setPref('suggestionsOpen', !open),
+      },
+      h('span', { class: 'disclosure__caret', 'aria-hidden': 'true' }, open ? '▾' : '▸'),
+      h('span', { class: 'disclosure__label' }, 'Suggestions'),
+      h('span', { class: 'disclosure__meta' }, counts.join(' · ')),
+    ),
+    open ? panels(ctx, due, deals) : null,
+  );
+}
+
+function panels(ctx, due, deals) {
   return h(
     'div',
     { class: 'cols cols--2' },
@@ -301,11 +327,14 @@ function suggestions(ctx, entries) {
                   'div',
                   { class: 'row__main' },
                   h('div', { class: 'row__name' }, s.name),
+                  // Spans, not bare strings: .row__meta is a flex row and its
+                  // gap only separates elements, so loose text nodes ran
+                  // together as "every ~7 dayslast bought last week".
                   h(
                     'div',
                     { class: 'row__meta' },
-                    `every ~${s.cadence} days`,
-                    `last bought ${relativeDays(s.daysSince)}`,
+                    h('span', {}, `every ~${s.cadence} days`),
+                    h('span', {}, `last bought ${relativeDays(s.daysSince)}`),
                   ),
                 ),
                 h(
