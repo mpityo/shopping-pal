@@ -207,6 +207,22 @@ function feedStatus(feed, state) {
   const age = feedAgeDays(feed);
   const manualCount = state.manualDeals.length;
 
+  // A partial refresh is the failure that hides best: the file updates every
+  // morning, the date looks current, and the only symptom is a short list.
+  if (feed.status === 'ok' && !isStale(feed) && feed.partialError) {
+    return h(
+      'div',
+      { class: 'notice notice--warn' },
+      h('strong', {}, `Only part of the ad came through — ${pluralize(feed.deals.length, 'deal')}`),
+      'One of the sources did not answer, so this is not the whole week. The rest of the ad is in store, and deals can be added by hand below.',
+      h(
+        'p',
+        { class: 'dept-note', style: { marginTop: '0.5rem', marginBottom: 0 } },
+        `Refreshed ${formatLongDate(feed.updated.slice(0, 10))} — ${feed.partialError}`,
+      ),
+    );
+  }
+
   if (feed.status === 'ok' && !isStale(feed)) {
     return h(
       'div',

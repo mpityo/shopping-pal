@@ -53,6 +53,13 @@ const defaultState = () => ({
     groupBy: 'dept',
     hideChecked: false,
     person: 'all',
+    /**
+     * Suggestions start folded away. They sat between the search box and the
+     * list, so on a phone the list itself started below the fold — the one
+     * thing the page exists to show. Opening them is one tap and the choice
+     * sticks.
+     */
+    suggestionsOpen: false,
     theme: 'auto',
     lastSeenDeals: null,
     /**

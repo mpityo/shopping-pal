@@ -228,6 +228,20 @@ const CANDIDATES = [
 const FLIPP = 'https://backflipp.wishabi.com/flipp';
 
 /**
+ * Query shapes for the item search, tried in order.
+ *
+ * `limit=500` looks harmless and is not: the service answers it with HTTP 422,
+ * so every scheduled run since the weekly ad was wired up fetched nothing and
+ * published the seven digital coupons on their own. The bare query is the one
+ * discovery actually proved — it returned 149 shelf BOGOs — so it goes first
+ * and the paged variants are only a fallback if the default page ever shrinks.
+ */
+const SEARCH_VARIANTS = [
+  ['default page', (postal) => `${FLIPP}/items/search?locale=en-us&postal_code=${postal}&q=bogo`],
+  ['limit 100', (postal) => `${FLIPP}/items/search?locale=en-us&postal_code=${postal}&q=bogo&limit=100`],
+];
+
+/**
  * The weekly ad, via the circular platform that renders it.
  *
  * Discovery found it here after proving Publix's own savings API carries only
@@ -240,6 +254,20 @@ const FLIPP = 'https://backflipp.wishabi.com/flipp';
  *    ("Campari Tomatoes† BOGO*"), which have to come off before the names can
  *    match the catalogue.
  */
+async function searchItems(postal) {
+  const errors = [];
+  for (const [name, build] of SEARCH_VARIANTS) {
+    try {
+      const rows = selectRows(await getJson(build(postal)));
+      if (rows.length) return rows;
+      errors.push(`${name}: no rows`);
+    } catch (err) {
+      errors.push(`${name}: ${err.message}`);
+    }
+  }
+  throw new Error(`item search failed (${errors.join('; ')})`);
+}
+
 async function fetchWeeklyAd(postal) {
   const merchants = selectRows(await getJson(`${FLIPP}/merchants?locale=en-us&postal_code=${postal}`));
   const publix = merchants.filter((m) =>
@@ -252,9 +280,7 @@ async function fetchWeeklyAd(postal) {
   const ids = new Set(publix.map((m) => m.id));
   log(`  matched ${publix.length} Publix merchant(s): ${publix.map((m) => `${m.name}#${m.id}`).join(', ')}`);
 
-  const items = selectRows(
-    await getJson(`${FLIPP}/items/search?locale=en-us&postal_code=${postal}&q=bogo&limit=500`),
-  );
+  const items = await searchItems(postal);
   const mine = items.filter((i) => ids.has(i.merchant_id));
   log(`  ${items.length} rows in the area, ${mine.length} from Publix`);
 
@@ -358,7 +384,14 @@ async function main() {
       }
     }
     log(`combined ${results.map((r) => `${r.name}: ${r.deals.length}`).join(', ')} → ${merged.length} unique`);
-    await publish(merged, results.map((r) => r.url).join(' + '));
+    // One source answering is not success. The weekly ad is the bulk of the
+    // BOGOs and the coupon gallery is a handful, so a run that quietly drops
+    // the ad looks identical to a healthy one — seven deals, status ok, no
+    // warning anywhere. Record what was lost so the app can say so.
+    if (failures.length) {
+      console.log(`::warning title=Publix BOGO refresh incomplete::${failures.join('; ')}`);
+    }
+    await publish(merged, results.map((r) => r.url).join(' + '), failures);
     return;
   }
 
@@ -603,7 +636,7 @@ function normalise(payload) {
 
 // ── Output ───────────────────────────────────────────────────────────────
 
-async function publish(deals, source) {
+async function publish(deals, source, failures = []) {
   const now = new Date();
   const payload = {
     status: 'ok',
@@ -613,6 +646,9 @@ async function publish(deals, source) {
     validThrough: nextWednesday(now),
     source,
     count: deals.length,
+    // Present only when some sources answered and others did not, so the app
+    // can flag a thin feed instead of presenting it as the whole ad.
+    partialError: failures.length ? failures.join('; ') : null,
     deals,
   };
 

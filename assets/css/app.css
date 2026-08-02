@@ -837,6 +837,57 @@ textarea {
   letter-spacing: 0.06em;
 }
 
+/* ── Disclosure ────────────────────────────────────────────────────────── */
+
+.disclosure {
+  margin-bottom: 1.25rem;
+}
+
+.disclosure__toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
+  padding: 0.6rem 0.75rem;
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.disclosure__toggle:hover {
+  border-color: var(--ink-3);
+}
+
+.disclosure__caret {
+  color: var(--ink-3);
+  font-size: 0.8rem;
+  width: 0.9rem;
+}
+
+.disclosure__label {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--ink-3);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.disclosure__meta {
+  margin-left: auto;
+  font-size: 0.8rem;
+  color: var(--ink-3);
+}
+
+/* The panels carry their own bottom margin as cards, so only the gap under
+   the toggle needs adding back. */
+.disclosure__toggle[aria-expanded='true'] {
+  margin-bottom: 1rem;
+}
+
 /* ── Stats ─────────────────────────────────────────────────────────────── */
 
 .stat-grid {
