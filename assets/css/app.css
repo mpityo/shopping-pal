@@ -1005,6 +1005,78 @@ textarea {
   margin-bottom: 0.15rem;
 }
 
+/* ── Search-as-you-type item picker ────────────────────────────────────── */
+
+.combo {
+  position: relative;
+}
+
+.combo__input {
+  width: 100%;
+}
+
+/* Nothing chosen yet is a state worth seeing across a table of rows. */
+.combo__input--empty {
+  border-color: var(--deal);
+  background: var(--deal-tint);
+}
+
+/* Fixed, not absolute: this lives inside a scrolling table inside a dialog,
+   and anything else gets clipped by an ancestor's overflow. */
+.combo__list {
+  position: fixed;
+  z-index: 60;
+  overflow-y: auto;
+  background: var(--surface);
+  border: 2px solid var(--ink);
+  border-radius: var(--radius);
+  box-shadow: 0 8px 24px rgb(0 0 0 / 0.18);
+}
+
+.combo__opt {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  padding: 0.55rem 0.7rem;
+  cursor: pointer;
+  border-bottom: 1px solid var(--line);
+  font-size: 0.9rem;
+}
+
+.combo__opt:last-child {
+  border-bottom: 0;
+}
+
+.combo__opt--active {
+  background: var(--brand-tint);
+}
+
+.combo__opt--action {
+  font-weight: 700;
+  color: var(--brand-ink);
+  background: var(--surface-2);
+}
+
+.combo__opt--action.combo__opt--active {
+  background: var(--brand-tint);
+}
+
+.combo__name {
+  flex: 1;
+}
+
+.combo__meta {
+  font-size: 0.75rem;
+  color: var(--ink-3);
+  white-space: nowrap;
+}
+
+.combo__empty {
+  padding: 0.55rem 0.7rem;
+  font-size: 0.85rem;
+  color: var(--ink-3);
+}
+
 /* Prose read of the trends. Wider measure than the tables around it, since
    this is the one place in the app you read sentences rather than scan. */
 .plain-list {

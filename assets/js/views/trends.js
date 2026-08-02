@@ -18,6 +18,7 @@ import {
   relativeDays,
 } from '../insights.js';
 import * as ai from '../ai.js';
+import { departmentHint } from './ai-hints.js';
 
 let sort = { key: 'count', dir: 'desc' };
 let tableFilter = '';
@@ -88,6 +89,7 @@ export function renderTrends(ctx) {
       departmentCard(trips),
     ),
 
+    uncataloguedCard(ctx),
     narrativeCard(ctx, trips, stats),
     spendCard(ctx, trips),
     tripsCard(series),
@@ -183,6 +185,186 @@ function departmentCard(trips) {
             h('span', { class: 'bar__value' }, String(t.count)),
           ),
         ),
+      ),
+    ),
+  );
+}
+
+// ── Bought, but not in the catalog ───────────────────────────────────────
+
+/**
+ * Things the receipts keep showing that the catalog has never had.
+ *
+ * This is the answer to "we've started buying Gatorade Zero and it's nowhere".
+ * A line with no match used to vanish at import, so the purchase never reached
+ * a trip and no trend could notice it — the app was structurally blind to
+ * anything new. Now the sightings are kept, and once one has happened twice it
+ * gets asked about here.
+ *
+ * Adopting one backfills the earlier purchases into the trips they came from,
+ * so it arrives with its history rather than looking brand new.
+ */
+function uncataloguedCard(ctx) {
+  const repeats = store.unmatchedRepeats(2);
+  if (!repeats.length) return null;
+
+  return h(
+    'section',
+    { class: 'card card--deal' },
+    h(
+      'div',
+      { class: 'card__head' },
+      h('h3', {}, 'Bought, but not in your catalog'),
+      h('span', { class: 'spacer' }),
+      h('span', { class: 'dept-note' }, pluralize(repeats.length, 'item')),
+    ),
+    h(
+      'div',
+      { class: 'card__body' },
+      h(
+        'p',
+        { class: 'dept-note' },
+        'These came up on more than one receipt and were left out because nothing in the catalog was them. Adding one records the purchases below against the trips they came from, so it starts with its history rather than from scratch.',
+      ),
+    ),
+    h(
+      'ul',
+      { class: 'rows' },
+      repeats.map((entry) =>
+        h(
+          'li',
+          { class: 'row' },
+          h(
+            'div',
+            { class: 'row__main' },
+            h('div', { class: 'row__name' }, entry.name),
+            h(
+              'div',
+              { class: 'row__meta' },
+              `${pluralize(entry.count, 'time')} · ${entry.seen
+                .map((s) => `${formatShortDate(s.date)}${s.priceCents != null ? ` ${formatMoney(s.priceCents)}` : ''}`)
+                .join(' · ')}`,
+            ),
+          ),
+          h(
+            'div',
+            { class: 'row__actions' },
+            h(
+              'button',
+              {
+                class: 'btn btn--sm btn--primary',
+                onClick: () => adoptDialog(ctx, entry),
+              },
+              'Add to catalog',
+            ),
+            h(
+              'button',
+              {
+                class: 'icon-btn',
+                type: 'button',
+                title: 'Stop asking about this',
+                'aria-label': `Ignore ${entry.name}`,
+                onClick: () => {
+                  store.ignoreUnmatched(entry.key);
+                  toast(`Won't ask about ${entry.name} again`);
+                  ctx.rerender();
+                },
+              },
+              '✕',
+            ),
+          ),
+        ),
+      ),
+    ),
+  );
+}
+
+function adoptDialog(ctx, entry) {
+  const nameInput = h('input', { type: 'text', id: 'adopt-name', value: entry.name, required: true });
+  const deptSelect = h(
+    'select',
+    { id: 'adopt-dept' },
+    store.departments().map((d) => h('option', { value: d.id }, `${d.name} — ${d.aisle}`)),
+  );
+  const personSelect = h(
+    'select',
+    { id: 'adopt-person' },
+    h('option', { value: '' }, 'Everyone'),
+    store.people().map((p) => h('option', { value: p.id }, p.name)),
+  );
+  const existingPicker = h(
+    'select',
+    { id: 'adopt-existing' },
+    h('option', { value: '' }, '— it is something new —'),
+    store
+      .items()
+      .sort((a, b) => a.name.localeCompare(b.name))
+      .map((i) => h('option', { value: i.id }, i.name)),
+  );
+
+  const hint = departmentHint(deptSelect);
+  hint.ask(entry.name);
+
+  const dialog = modal(
+    `Add ${entry.name}`,
+    h(
+      'form',
+      {
+        onSubmit: (e) => {
+          e.preventDefault();
+          // It may not be new at all — "GATORADE ZR" might just be wording
+          // for something already in the catalog, in which case adopting it
+          // teaches the alias instead of creating a duplicate item.
+          let itemId = existingPicker.value;
+          if (!itemId) {
+            const name = nameInput.value.trim();
+            if (!name) return;
+            itemId = store.addCustomItem({
+              name,
+              dept: deptSelect.value,
+              person: personSelect.value || null,
+            });
+          }
+          const backfilled = store.adoptUnmatched(entry.key, itemId);
+          dialog.close();
+          toast(
+            backfilled
+              ? `Added · ${pluralize(backfilled, 'past purchase')} recorded`
+              : 'Added to the catalog',
+          );
+          ctx.rerender();
+        },
+      },
+      h(
+        'p',
+        { class: 'hint' },
+        `Seen ${pluralize(entry.count, 'time')} on receipts, most recently ${formatLongDate(entry.last)}. Those purchases will be recorded against their trips.`,
+      ),
+      h(
+        'div',
+        { class: 'field' },
+        h('label', { for: 'adopt-existing' }, 'Is it already in the catalog?'),
+        h(
+          'p',
+          { class: 'hint' },
+          'If this is just receipt wording for something you already have, pick it here and the wording is learned instead of adding a duplicate.',
+        ),
+        existingPicker,
+      ),
+      h('div', { class: 'field' }, h('label', { for: 'adopt-name' }, 'Or add it as'), nameInput),
+      h(
+        'div',
+        { class: 'field' },
+        h('label', { for: 'adopt-dept' }, 'Where is it in the store?'),
+        deptSelect,
+        hint.node,
+      ),
+      h('div', { class: 'field' }, h('label', { for: 'adopt-person' }, 'For (optional)'), personSelect),
+      h(
+        'div',
+        { class: 'btn-row' },
+        h('button', { class: 'btn btn--primary', type: 'submit' }, 'Add and record the history'),
+        h('button', { class: 'btn btn--ghost', type: 'button', onClick: () => dialog.close() }, 'Cancel'),
       ),
     ),
   );

@@ -23,6 +23,8 @@ import {
 import * as ocr from '../ocr.js';
 import * as pdf from '../pdf.js';
 import * as ai from '../ai.js';
+import { itemPicker } from './item-picker.js';
+import { departmentHint } from './ai-hints.js';
 
 const STORES = ['Publix', 'Walmart', 'Target', 'Aldi', 'Costco', 'Other'];
 
@@ -153,7 +155,7 @@ export function openImporter(ctx, { initialFile = null, initialText = '' } = {})
 // ── Review ───────────────────────────────────────────────────────────────
 
 function openReview(ctx, parsed) {
-  const catalog = store.items();
+  let catalog = store.items();
   const aliases = store.getState().aliases;
   const matched = matchLines(parsed.lines, catalog, aliases);
 
@@ -224,7 +226,7 @@ function openReview(ctx, parsed) {
         tableBody.children[i].style.background =
           f.status === 'duplicate'
             ? 'var(--alert-tint)'
-            : row.confidence !== 'high' && row.confidence !== 'alias'
+            : !settled(row)
               ? 'var(--deal-tint)'
               : '';
       }
@@ -282,9 +284,15 @@ function openReview(ctx, parsed) {
     refreshSummary();
   }
 
+  /** A mapping nobody needs to look at again: exact, taught, or just created. */
+  function settled(row) {
+    return ['high', 'alias', 'created'].includes(row.confidence);
+  }
+
   function noteFor(row) {
     if (row.status === 'duplicate') return 'already recorded with a price';
     if (row.status === 'enrich') return 'you checked this off — adding the price';
+    if (row.confidence === 'created') return 'new catalog item';
     if (row.confidence === 'alias') return 'learned previously';
     if (row.confidence === 'high') return 'matched';
     if (row.confidence === 'ai-high') return 'read by Claude — worth a glance';
@@ -332,7 +340,7 @@ function openReview(ctx, parsed) {
         if (!target) return;
         target.row.itemId = suggestion.itemId;
         target.row.confidence = suggestion.confidence === 'high' ? 'ai-high' : 'ai-low';
-        if (target.row.select) target.row.select.value = suggestion.itemId;
+        target.row.picker?.setValue(suggestion.itemId);
         applied++;
       });
 
@@ -387,38 +395,124 @@ function openReview(ctx, parsed) {
     );
   }
 
-  function itemPicker(row) {
-    // Candidates first, then everything else, so the likely answer is at hand
-    // without hiding the rest of the catalog.
-    const ranked = [
-      ...row.candidates,
-      ...catalog
-        .filter((i) => !row.candidates.some((c) => c.id === i.id))
-        .sort((a, b) => a.name.localeCompare(b.name)),
-    ];
-    const select = h(
-      'select',
-      {
-        'aria-label': `Item for ${row.line.name}`,
-        onChange: (e) => {
-          row.itemId = e.target.value || null;
-          row.taught = Boolean(e.target.value);
-          refreshSummary();
-        },
+  /** Catalog entries shaped for the picker, with the aisle as the tiebreaker. */
+  function pickerOptions() {
+    const deptNames = new Map(store.departments().map((d) => [d.id, d.name]));
+    return catalog.map((item) => ({
+      id: item.id,
+      name: item.name,
+      meta: [deptNames.get(item.dept), item.note].filter(Boolean).join(' · '),
+    }));
+  }
+
+  function buildPicker(row) {
+    const picker = itemPicker({
+      options: pickerOptions(),
+      // Seeded with what the receipt said, so opening the list already shows
+      // the plausible answers rather than the alphabet.
+      seed: row.line.name,
+      value: row.itemId,
+      label: `Item for ${row.line.name}`,
+      onPick: (id) => {
+        row.itemId = id;
+        row.taught = Boolean(id);
+        refreshSummary();
+        refreshDuplicates();
       },
-      h('option', { value: '' }, '— skip this line —'),
-      ranked.map((item) =>
+      onCreate: (name) => createItemFor(row, name),
+    });
+    // Kept so a suggestion arriving later can move the control the user is
+    // already looking at, and so a new item can be added to every row's list.
+    row.picker = picker;
+    return picker.node;
+  }
+
+  /**
+   * Add something the catalog has never had, without losing the import.
+   *
+   * "Not in the catalog" is a normal outcome rather than a failure: whole
+   * carrots when only shredded and baby are listed, or something the house
+   * has just started buying. Forcing it into the nearest wrong item is how
+   * the trends quietly become fiction, and skipping it loses the purchase
+   * altogether.
+   */
+  function createItemFor(row, prefill) {
+    const nameInput = h('input', {
+      type: 'text',
+      id: 'new-item-name',
+      value: prefill || row.line.name,
+      required: true,
+    });
+    const deptSelect = h(
+      'select',
+      { id: 'new-item-dept' },
+      store.departments().map((d) => h('option', { value: d.id }, `${d.name} — ${d.aisle}`)),
+    );
+    const noteInput = h('input', { type: 'text', id: 'new-item-note', placeholder: 'Brand, size…' });
+    const personSelect = h(
+      'select',
+      { id: 'new-item-person' },
+      h('option', { value: '' }, 'Everyone'),
+      store.people().map((p) => h('option', { value: p.id }, p.name)),
+    );
+
+    const hint = departmentHint(deptSelect);
+    hint.ask(nameInput.value);
+    nameInput.addEventListener('change', () => hint.ask(nameInput.value));
+
+    const dialog = modal(
+      'Add to the catalog',
+      h(
+        'form',
+        {
+          onSubmit: (e) => {
+            e.preventDefault();
+            const name = nameInput.value.trim();
+            if (!name) return;
+            const id = store.addCustomItem({
+              name,
+              dept: deptSelect.value,
+              note: noteInput.value.trim(),
+              person: personSelect.value || null,
+            });
+            // The catalog changed underneath every open picker.
+            catalog = store.items();
+            const options = pickerOptions();
+            for (const other of rows) other.picker?.setOptions(options);
+
+            row.itemId = id;
+            row.taught = true;
+            row.confidence = 'created';
+            row.picker?.setValue(id);
+            dialog.close();
+            refreshSummary();
+            refreshDuplicates();
+            toast(`${name} added to the catalog`);
+          },
+        },
         h(
-          'option',
-          { value: item.id, selected: item.id === row.itemId },
-          row.candidates.some((c) => c.id === item.id) ? `★ ${item.name}` : item.name,
+          'p',
+          { class: 'hint' },
+          `The receipt says “${row.line.name}”. Adding it here records this purchase and matches it automatically on every future receipt.`,
+        ),
+        h('div', { class: 'field' }, h('label', { for: 'new-item-name' }, 'Name'), nameInput),
+        h(
+          'div',
+          { class: 'field' },
+          h('label', { for: 'new-item-dept' }, 'Where is it in the store?'),
+          deptSelect,
+          hint.node,
+        ),
+        h('div', { class: 'field' }, h('label', { for: 'new-item-note' }, 'Note (optional)'), noteInput),
+        h('div', { class: 'field' }, h('label', { for: 'new-item-person' }, 'For (optional)'), personSelect),
+        h(
+          'div',
+          { class: 'btn-row' },
+          h('button', { class: 'btn btn--primary', type: 'submit' }, 'Add and use it'),
+          h('button', { class: 'btn btn--ghost', type: 'button', onClick: () => dialog.close() }, 'Cancel'),
         ),
       ),
     );
-    // Kept so a suggestion arriving later can move the dropdown the user is
-    // already looking at.
-    row.select = select;
-    return select;
   }
 
   for (const row of rows) {
@@ -449,9 +543,9 @@ function openReview(ctx, parsed) {
       ),
       h('td', { class: 'num' }, String(row.qty)),
       h('td', { class: 'num' }, formatMoney(row.line.priceCents)),
-      h('td', { style: { minWidth: '15rem' } }, itemPicker(row)),
+      h('td', { style: { minWidth: '16rem' } }, buildPicker(row)),
     );
-    if (row.confidence !== 'high' && row.confidence !== 'alias') {
+    if (!settled(row)) {
       tr.style.background = 'var(--deal-tint)';
     }
     tr.dataset.line = String(row.line.priceCents);
@@ -546,6 +640,21 @@ function openReview(ctx, parsed) {
                 toast('Nothing selected to import');
                 return;
               }
+
+              // Lines going in without a home are not simply discarded. The
+              // third time one shows up it is worth saying so, and by then
+              // the purchases can be backfilled from what was recorded here.
+              store.noteUnmatched(
+                rows
+                  .filter((r) => !r.itemId)
+                  .map((r) => ({
+                    name: r.line.name,
+                    date: dateInput.value,
+                    store: storeSelect.value,
+                    priceCents: r.line.priceCents,
+                    qty: r.qty,
+                  })),
+              );
               const learned = {};
               for (const row of kept) {
                 // A confident match left untouched in this table has been
