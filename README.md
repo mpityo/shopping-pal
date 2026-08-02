@@ -17,6 +17,9 @@ It answers the things Notes could not:
   invite link — every phone in the house sees the same list.
 - **Receipt import.** Paste or photograph a receipt to record a trip, with
   prices, so the trends have real history and real spend behind them.
+- **Claude, optionally.** Reads receipt abbreviations, picks the aisle for an
+  unfamiliar item, and writes the short version of the trends. Off until you
+  add a key.
 
 ## Using it
 
@@ -26,7 +29,7 @@ It answers the things Notes could not:
 | **Catalog** | All 171 items from the Notes list. Search, filter, edit an item's aisle, add new ones. |
 | **BOGOs** | The Publix ad, with your regulars called out. |
 | **Trends** | Everything computed from finished trips. |
-| **Setup** | Who's in the household, the shared list, the store route, and export/import of your data. |
+| **Setup** | Who's in the household, the shared list, Claude, the store route, and export/import of your data. |
 
 ## Importing receipts
 
@@ -51,7 +54,9 @@ confidently, what it is unsure about, and what needs picking.
 
 **Corrections are remembered.** `GV SHRD MOZZ` is never going to fuzzy-match
 shredded cheese, so fix it once and every future receipt maps it automatically.
-Setup lists what has been learned, in case something needs unlearning.
+Setup lists what has been learned, in case something needs unlearning. With a
+Claude key added, the abbreviations are read for you and you mostly stop doing
+this by hand — see [Claude](#claude).
 
 **Two stores, one trip.** Importing a second receipt with the same date merges
 into that trip rather than creating another, so a Publix run and a Walmart run
@@ -86,6 +91,74 @@ useful, since stores eat signal.
 placeholders ship with it; rename them, add more, or remove them. Items like
 bagels, snacks, soda, cereal and La Croix are tagged per person, and those tags
 follow whatever you name people.
+
+## Claude
+
+Optional, off by default, and useless to steal from the repo — the key lives on
+your phone, not in this project.
+
+### What it does, and what it deliberately does not
+
+Three jobs, all of them things arithmetic cannot do:
+
+- **Reads receipt abbreviations.** `GV SHRD MOZZ` is never going to fuzzy-match
+  shredded cheese. Only the lines the local matcher gave up on are sent, so a
+  receipt whose names already resolve costs nothing. Suggestions land in the
+  same review table as everything else, labelled as Claude's, and still have to
+  be confirmed. Confident matches are then remembered as aliases, so the same
+  wording is free forever after.
+- **Picks the aisle for a new item.** Add "tahini" and the department dropdown
+  fills itself in. Constrained to your actual department list, so the worst case
+  is a wrong answer in a dropdown you already have open.
+- **Writes the short version of the trends.** What is becoming a regular, what
+  quietly stopped, what is overdue — in sentences.
+
+**It is never asked to count.** Every figure in this app — how often something
+is bought, its typical gap, what is overdue, what a trip cost — is computed in
+`insights.js` and stays there. The trends read-out is handed those finished
+numbers and told to write prose over them, not to work anything out. A language
+model is worse at counting than `Math.round` is, and would sometimes be
+confidently wrong. So the division is strict: the app does the arithmetic,
+Claude does the language.
+
+### The key
+
+**One per device, pasted into Setup → Claude.** It is kept in its own storage
+slot, deliberately outside the application state object — which means there is
+no code path, now or later, that can sweep it into the shared vault or into an
+exported backup. Both of those end up somewhere world-readable, and unlike the
+GitHub token this key is billable.
+
+That is why it is not shared the way the list is: a stray invite link should
+cost you a grocery list, not a bill. The price of that choice is that each
+phone needs its own key, and a phone without one simply gets the fuzzy matcher
+and no trends read-out. Nothing here is load-bearing.
+
+Get one from [console.anthropic.com](https://console.anthropic.com). Setup
+shows a running tally of requests, tokens and rough spend, so a billable
+feature is never invisible.
+
+### What leaves the device
+
+| Sent | Never sent |
+| --- | --- |
+| Unmatched receipt line text | The receipt PDF or photo |
+| Your catalog item names | Prices, totals, tax, what you paid |
+| A new item's name | Anything about who is in the household |
+| Trend figures the app computed | The vault, the key, or the GitHub token |
+
+Requests go straight from your browser to Anthropic. Nothing passes through
+this repo, and nothing is written back to it.
+
+### Models
+
+| Job | Model | Why |
+| --- | --- | --- |
+| Receipt lines | `claude-haiku-4-5` | Runs on every import — this is the volume path, and it is a constrained extraction task |
+| New item's aisle | `claude-haiku-4-5` | Interactive; latency matters more than nuance |
+| Trends read-out | `claude-sonnet-5` | Once a week over a few hundred tokens, so the better writer is effectively free |
+
+Both are set in one place, `MODELS` at the top of `assets/js/ai.js`.
 
 ## The shared list
 
@@ -241,9 +314,11 @@ assets/js/ocr.js               optional photo OCR, loaded only when used
 assets/js/pdf.js               PDF text extraction, loaded only when used
 assets/js/crypto.js            key generation + encryption for the shared list
 assets/js/sync.js              reading/writing the shared file on GitHub
+assets/js/ai.js                optional Claude calls, key kept per device
 assets/js/data/catalog.js      the seed list from Notes
 assets/js/data/departments.js  the store route
 assets/js/views/               one module per tab
+assets/js/views/ai-hints.js    view glue for Claude's suggestions
 scripts/fetch-publix-bogos.mjs the Action's fetcher
 data/bogos.json                written by the Action, read by the page
 data/vault.json                the encrypted shared list (created from the app)

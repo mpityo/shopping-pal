@@ -2,6 +2,8 @@ import { h, toast, modal, pluralize } from '../util.js';
 import * as store from '../store.js';
 import { CATALOG } from '../data/catalog.js';
 import { sharingCard } from './sharing.js';
+import * as ai from '../ai.js';
+import { formatMoney } from '../receipts.js';
 
 export function renderSettings(ctx) {
   const state = store.getState();
@@ -20,6 +22,7 @@ export function renderSettings(ctx) {
 
     householdCard(ctx, state),
     sharingCard(ctx),
+    assistCard(ctx, state),
     aisleEditor(ctx, depts),
     dataCard(ctx, state),
     archivedCard(ctx, state),
@@ -117,6 +120,189 @@ function householdCard(ctx, state) {
         },
         '+ Add a person',
       ),
+    ),
+  );
+}
+
+// ── Claude assistance ────────────────────────────────────────────────────
+
+/**
+ * The device key for Claude.
+ *
+ * Set up per phone on purpose. Unlike the GitHub token, this one is billable,
+ * so it is deliberately kept out of the shared vault and out of backups: it
+ * lives in its own storage slot that no sync or export path touches. The cost
+ * is that each phone needs its own key. That is the right way round — a lost
+ * invite link should not be able to spend money.
+ */
+function assistCard(ctx, state) {
+  const configured = ai.hasKey();
+  const keyInput = h('input', {
+    type: 'password',
+    id: 'claude-key',
+    placeholder: configured ? '•••••••••••••••• (saved on this device)' : 'sk-ant-…',
+    autocomplete: 'off',
+    spellcheck: false,
+    style: { width: '100%', maxWidth: '26rem', fontFamily: 'var(--mono)' },
+  });
+  const status = h('p', { class: 'hint' });
+
+  async function save() {
+    const value = keyInput.value.trim();
+    if (!value) {
+      status.textContent = 'Paste a key first.';
+      return;
+    }
+    if (!ai.looksLikeKey(value)) {
+      status.textContent =
+        'That does not look like an Anthropic key — they start with sk-ant-. (A GitHub token goes in the Shared list card above.)';
+      return;
+    }
+    const previous = ai.getKey();
+    ai.setKey(value);
+    status.textContent = 'Checking the key…';
+    try {
+      await ai.testKey();
+      keyInput.value = '';
+      status.textContent = '';
+      toast('Claude connected on this device');
+      ctx.rerender();
+    } catch (err) {
+      ai.setKey(previous);
+      status.textContent = `${err.message} Nothing was saved.`;
+    }
+  }
+
+  const used = ai.usage();
+  const spent = ai.estimatedCents(used);
+
+  return h(
+    'section',
+    { class: 'card' },
+    h(
+      'div',
+      { class: 'card__head' },
+      h('h3', {}, 'Claude'),
+      h('span', { class: 'spacer' }),
+      h('span', { class: 'dept-note' }, configured ? 'On, this device' : 'Not set up'),
+    ),
+    h(
+      'div',
+      { class: 'card__body' },
+      h(
+        'p',
+        { class: 'dept-note', style: { marginBottom: '0.75rem' } },
+        'Three jobs, all of them things arithmetic cannot do: reading receipt abbreviations like “GV SHRD MOZZ”, guessing the aisle for an item the catalog has never seen, and writing the short read on the Trends tab. Every number the app shows is still calculated by the app — Claude is never asked to count, because it would be worse at it.',
+      ),
+      configured
+        ? h(
+            'div',
+            { class: 'notice' },
+            h('strong', {}, 'A key is saved in this browser'),
+            'It is stored on its own, outside the app data — so it is never written to the shared list and never included in an exported backup. Every other phone in the house needs its own.',
+          )
+        : h(
+            'div',
+            { class: 'notice' },
+            h('strong', {}, 'Optional, and off until you add a key'),
+            'Without one the app works exactly as it does now: the fuzzy matcher still matches receipts, new items still default to a department, and the Trends numbers are unchanged. Get a key from console.anthropic.com — it is billed to your account, not through this app.',
+          ),
+      h(
+        'div',
+        { class: 'field' },
+        h('label', { for: 'claude-key' }, configured ? 'Replace the key' : 'Anthropic API key'),
+        keyInput,
+      ),
+      status,
+      h(
+        'div',
+        { class: 'btn-row' },
+        h('button', { class: 'btn btn--primary', onClick: save }, configured ? 'Replace key' : 'Save and test'),
+        configured &&
+          h(
+            'button',
+            {
+              class: 'btn btn--danger',
+              onClick: () => {
+                if (confirm('Remove the Claude key from this browser? Everything else keeps working.')) {
+                  ai.clearKey();
+                  toast('Claude key removed');
+                  ctx.rerender();
+                }
+              },
+            },
+            'Remove key',
+          ),
+      ),
+    ),
+    configured &&
+      h(
+        'ul',
+        { class: 'rows' },
+        toggleRow(
+          ctx,
+          'aiMatch',
+          state.prefs.aiMatch !== false,
+          'Match receipt lines',
+          `Sends the lines the app could not match, plus your catalog names, to ${ai.MODELS.match}. Prices, totals and the receipt file stay on this device.`,
+        ),
+        toggleRow(
+          ctx,
+          'aiDept',
+          state.prefs.aiDept !== false,
+          'Suggest the aisle for new items',
+          `Sends just the item name to ${ai.MODELS.department} and preselects a department. You can always change it.`,
+        ),
+      ),
+    configured &&
+      h(
+        'div',
+        { class: 'card__body' },
+        h(
+          'p',
+          { class: 'dept-note' },
+          used.calls
+            ? `${pluralize(used.calls, 'request')} since ${used.since ?? 'setup'} · ${used.inputTokens.toLocaleString()} in, ${used.outputTokens.toLocaleString()} out · roughly ${formatMoney(spent)} at list prices. That is this app's own tally and an estimate — your console has the real figure.`
+            : 'Nothing spent yet.',
+        ),
+        used.calls
+          ? h(
+              'button',
+              {
+                class: 'btn btn--sm btn--ghost',
+                onClick: () => {
+                  ai.resetUsage();
+                  toast('Tally reset');
+                  ctx.rerender();
+                },
+              },
+              'Reset the tally',
+            )
+          : null,
+      ),
+  );
+}
+
+function toggleRow(ctx, pref, checked, label, description) {
+  return h(
+    'li',
+    { class: 'row' },
+    h('input', {
+      type: 'checkbox',
+      class: 'check',
+      checked,
+      id: `pref-${pref}`,
+      style: { width: '20px', height: '20px' },
+      onChange: (e) => {
+        store.setPref(pref, e.target.checked);
+        ctx.rerender();
+      },
+    }),
+    h(
+      'div',
+      { class: 'row__main' },
+      h('label', { class: 'row__name', for: `pref-${pref}`, style: { margin: 0 } }, label),
+      h('div', { class: 'row__meta', style: { whiteSpace: 'normal' } }, description),
     ),
   );
 }
@@ -402,6 +588,10 @@ function aboutCard() {
         about(
           'Trends',
           'Computed entirely from the trips you finish in the app. No trips, no numbers — nothing here is estimated or filled in for you.',
+        ),
+        about(
+          'Claude',
+          'Off unless a key is added above, and even then only three things: reading receipt abbreviations, guessing an aisle for an unfamiliar item, and writing the short read on Trends. It is never asked to calculate anything — every figure in the app comes from the trips you recorded. Receipt files, photos, prices and totals never leave this device; only item names and your catalog names are sent.',
         ),
         about(
           'The shared list',

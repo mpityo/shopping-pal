@@ -44,6 +44,13 @@ const defaultState = () => ({
     person: 'all',
     theme: 'auto',
     lastSeenDeals: null,
+    /**
+     * Claude assistance, per device. Flat keys rather than a nested object so
+     * they merge with the defaults on load. These only matter when a key has
+     * been added in Setup; without one every feature is simply absent.
+     */
+    aiMatch: true,
+    aiDept: true,
   },
 });
 

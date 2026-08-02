@@ -2,6 +2,7 @@ import { h, toast, matchScore, modal } from '../util.js';
 import * as store from '../store.js';
 import { dueItems, relativeDays } from '../insights.js';
 import { matchDealsToCatalog } from '../deals-data.js';
+import { departmentHint } from './ai-hints.js';
 
 /** Kept outside render so a re-render doesn't wipe what's being typed. */
 let quickQuery = '';
@@ -216,6 +217,8 @@ function createNew(name, ctx) {
     h('option', { value: '' }, 'Everyone'),
     store.people().map((p) => h('option', { value: p.id }, p.name)),
   );
+  const deptHint = departmentHint(select);
+  deptHint.ask(name);
 
   const dialog = modal(
     'Add a new item',
@@ -245,6 +248,7 @@ function createNew(name, ctx) {
         h('label', { for: 'new-dept' }, 'Where is it in the store?'),
         h('p', { class: 'hint' }, 'This sets where it appears on the shopping route.'),
         select,
+        deptHint.node,
       ),
       h('div', { class: 'field' }, h('label', { for: 'new-note' }, 'Note (optional)'), noteInput),
       h('div', { class: 'field' }, h('label', { for: 'new-person' }, 'For (optional)'), personSelect),

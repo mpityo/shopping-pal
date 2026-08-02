@@ -11,10 +11,13 @@ import {
   departmentTotals,
   tripCadence,
   oneOffItems,
+  dueItems,
+  neverBought,
   formatLongDate,
   formatShortDate,
   relativeDays,
 } from '../insights.js';
+import * as ai from '../ai.js';
 
 let sort = { key: 'count', dir: 'desc' };
 let tableFilter = '';
@@ -85,6 +88,7 @@ export function renderTrends(ctx) {
       departmentCard(trips),
     ),
 
+    narrativeCard(ctx, trips, stats),
     spendCard(ctx, trips),
     tripsCard(series),
     cadenceTable(ctx, stats),
@@ -181,6 +185,202 @@ function departmentCard(trips) {
         ),
       ),
     ),
+  );
+}
+
+// ── The written read ─────────────────────────────────────────────────────
+
+const NARRATIVE_SLOT = 'shopping-pal.ai-narrative';
+
+/**
+ * A stable signature of the history the read was written from, so a cached
+ * paragraph is only ever shown next to the numbers it actually describes. Any
+ * new trip, or any change to one, invalidates it.
+ */
+function narrativeSignature(trips) {
+  const lines = trips.reduce((n, t) => n + t.items.length, 0);
+  const priced = trips.reduce(
+    (n, t) => n + t.items.filter((i) => i.priceCents != null).length,
+    0,
+  );
+  return `${trips.length}:${trips[trips.length - 1]?.date}:${lines}:${priced}`;
+}
+
+function readNarrative(signature) {
+  try {
+    const cached = JSON.parse(localStorage.getItem(NARRATIVE_SLOT) || 'null');
+    return cached?.signature === signature ? cached : null;
+  } catch {
+    return null;
+  }
+}
+
+function writeNarrative(signature, result) {
+  try {
+    localStorage.setItem(
+      NARRATIVE_SLOT,
+      JSON.stringify({ signature, ...result, at: new Date().toISOString() }),
+    );
+  } catch {
+    /* the read still displays, it just will not survive a reload */
+  }
+}
+
+/**
+ * Everything Claude is allowed to talk about, already worked out.
+ *
+ * Money arrives pre-formatted and counts arrive as finished integers, because
+ * the one thing this feature must never do is put a number on screen that the
+ * app did not calculate. Give the model figures to copy, not figures to
+ * combine.
+ */
+function narrativeFacts(trips, stats) {
+  const state = store.getState();
+  const listIds = new Set(Object.keys(state.list));
+  const spend = spendSummary(trips);
+  const all = [...stats.values()];
+
+  const describe = (s) => ({
+    item: s.name,
+    timesBought: s.count,
+    typicalGapDays: s.cadence,
+    daysSinceLastBought: s.daysSince,
+    firstBought: s.first,
+  });
+
+  return {
+    tripsRecorded: trips.length,
+    firstTrip: trips[0]?.date,
+    lastTrip: trips[trips.length - 1]?.date,
+    typicalDaysBetweenTrips: tripCadence(trips),
+    distinctItemsEverBought: stats.size,
+
+    spend: spend.hasPrices
+      ? {
+          note: spend.fromPrintedTotals
+            ? 'Totals are what the receipts actually charged.'
+            : 'Totals are summed shelf prices, not printed receipt totals.',
+          basedOn: `${spend.pricedTrips} of ${spend.totalTrips} trips have prices`,
+          total: formatMoney(spend.totalCents),
+          averagePerTrip: formatMoney(spend.avgTripCents),
+          byStore: spend.byStore.map(([name, cents]) => ({
+            store: name,
+            total: formatMoney(cents),
+          })),
+          topDepartments: spend.byDept
+            .slice(0, 6)
+            .map(([dept, cents]) => ({ department: departmentName(dept), total: formatMoney(cents) })),
+        }
+      : 'No prices recorded yet — do not discuss money.',
+
+    boughtMostOften: all
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 12)
+      .map(describe),
+
+    /** Bought repeatedly, but only since recently — the "becoming a regular" case. */
+    newlyRegular: all
+      .filter((s) => s.count >= 2 && s.daysSince != null && daysAgo(s.first) <= 90)
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 8)
+      .map(describe),
+
+    overdueAndNotOnTheList: dueItems(trips, listIds, 10).map(describe),
+
+    boughtOnceAndNotSince: oneOffItems(trips).slice(0, 10).map(describe),
+
+    inTheCatalogButNeverBought: neverBought(trips, store.items())
+      .slice(0, 15)
+      .map((i) => i.name),
+  };
+}
+
+function daysAgo(iso) {
+  if (!iso) return Infinity;
+  return Math.round((Date.now() - new Date(`${iso}T12:00:00`)) / 86_400_000);
+}
+
+/**
+ * Claude's read of the numbers above.
+ *
+ * Deliberately opt-in per refresh rather than automatic: it costs money, and a
+ * paragraph that silently re-bills every time the tab is opened is not a
+ * feature. The cached copy is shown until the history actually changes.
+ */
+function narrativeCard(ctx, trips, stats) {
+  if (!ai.hasKey()) return null;
+
+  const signature = narrativeSignature(trips);
+  const cached = readNarrative(signature);
+  const body = h('div', { class: 'card__body' });
+  const actions = h('div', { class: 'btn-row' });
+
+  function renderResult(result, at) {
+    body.replaceChildren(
+      h('p', { style: { fontWeight: '700', fontSize: '1.05rem', margin: '0 0 0.6rem' } }, result.headline),
+      h(
+        'ul',
+        { class: 'plain-list' },
+        (result.points ?? []).map((point) => h('li', {}, point)),
+      ),
+      h(
+        'p',
+        { class: 'dept-note', style: { marginTop: '0.75rem' } },
+        `Written by ${ai.MODELS.narrate} from the figures on this page${at ? ` on ${formatLongDate(at.slice(0, 10))}` : ''}. Every number here is the app's own — Claude was given them, not asked to work them out.`,
+      ),
+    );
+  }
+
+  async function run() {
+    body.replaceChildren(h('p', { class: 'dept-note' }, 'Reading the numbers…'));
+    actions.replaceChildren();
+    try {
+      const result = await ai.narrateTrends(narrativeFacts(trips, stats));
+      writeNarrative(signature, result);
+      renderResult(result, new Date().toISOString());
+      actions.replaceChildren(button('Read it again', run));
+    } catch (err) {
+      body.replaceChildren(
+        h(
+          'div',
+          { class: 'notice notice--warn' },
+          h('strong', {}, 'Could not reach Claude'),
+          err.message,
+        ),
+      );
+      actions.replaceChildren(button('Try again', run));
+    }
+  }
+
+  function button(label, onClick) {
+    return h('button', { class: 'btn btn--sm btn--ghost', onClick }, label);
+  }
+
+  if (cached) {
+    renderResult(cached, cached.at);
+    actions.append(button('Read it again', run));
+  } else {
+    body.replaceChildren(
+      h(
+        'p',
+        { class: 'dept-note' },
+        `A written read of the figures below — what is becoming a regular, what has quietly stopped, what is overdue. Costs a fraction of a cent, and only re-runs when you ask or when there is a new trip.`,
+      ),
+    );
+    actions.append(h('button', { class: 'btn btn--primary btn--sm', onClick: run }, 'Ask Claude to read this'));
+  }
+
+  return h(
+    'section',
+    { class: 'card card--accent' },
+    h(
+      'div',
+      { class: 'card__head' },
+      h('h3', {}, 'The short version'),
+      h('span', { class: 'spacer' }),
+      actions,
+    ),
+    body,
   );
 }
 
