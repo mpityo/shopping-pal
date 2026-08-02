@@ -62,6 +62,8 @@ jobs:
         if: ${{ !inputs.discover }}
         env:
           PUBLIX_STORE_NUMBER: ${{ inputs.store || vars.PUBLIX_STORE_NUMBER }}
+          # The weekly ad is keyed by postal code, not store number.
+          PUBLIX_POSTAL_CODE: ${{ inputs.postal || vars.PUBLIX_POSTAL_CODE }}
         run: node scripts/fetch-publix-bogos.mjs --out data/bogos.json
 
       - name: Commit if the feed changed

@@ -119,16 +119,22 @@ updating the site never overwrites them.
 
 **Publix BOGOs** — refreshed by [a scheduled Action](.github/workflows/refresh-bogos.yml)
 that commits `data/bogos.json`; the page just reads that file. It cannot be
-fetched live from the browser, because Publix sends no CORS headers.
+fetched live from the browser, because neither source sends CORS headers.
 
-> Publix publishes no documented API and the endpoints their own site uses
-> move around, so `scripts/fetch-publix-bogos.mjs` tries several candidates and
-> parses whatever JSON comes back. **This has not been confirmed against the
-> live site** — the network here could not reach publix.com. Run the workflow
-> manually once (Actions → Refresh Publix BOGOs → Run workflow) and check the
-> log. If every candidate fails, update `CANDIDATES` in that script with the
-> URL the Publix site actually calls (DevTools → Network on
-> publix.com/savings/weekly-ad).
+Two sources are combined:
+
+- **The weekly ad** — the shelf BOGOs, fetched from the circular platform that
+  renders Publix's ad. Keyed by **postal code**, and filtered to Publix, since
+  the search covers every merchant in the area.
+- **Digital coupons** — from `services.publix.com`, keyed by store number. Only
+  the genuine buy-one-get-one offers are kept; the plain "Save $1.00" coupons
+  that make up most of that feed are skipped.
+
+> Publix publishes no documented API, so both endpoints were found by probing.
+> If either shape changes, run the workflow with **discover** ticked: it tries
+> a spread of endpoints and reports what each returns — row counts, field
+> names, how many rows look like BOGOs, sample titles, and for the ad page,
+> which platform renders it. One log usually says what to change.
 >
 > A failed fetch is not fatal: the job stays green, records the failed attempt
 > in `data/bogos.json`, and the app says plainly that the feed is stale — and
@@ -147,8 +153,10 @@ numbers. Nothing is estimated or filled in for you.
 1. **Settings → Pages → Source: GitHub Actions.** Pushing to `main` deploys.
 2. **Settings → Actions → General → Workflow permissions: Read and write**, so
    the BOGO job can commit the refreshed feed.
-3. Optional: set a repository variable `PUBLIX_STORE_NUMBER` to your store's
-   number for store-specific deals.
+3. Set two repository variables (Settings → Secrets and variables → Actions):
+   `PUBLIX_POSTAL_CODE` for the weekly-ad BOGOs, and `PUBLIX_STORE_NUMBER` for
+   store-specific digital coupons. Without the postal code the weekly ad — the
+   shelf BOGOs, and the bulk of the deals — cannot be fetched.
 4. Optional: open the site, go to **Setup → Household** and name everyone, then
    **Setup → Shared list** to put the list on every phone via an invite link.
 

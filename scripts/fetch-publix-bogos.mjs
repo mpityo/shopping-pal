@@ -201,6 +201,60 @@ const CANDIDATES = [
   },
 ];
 
+const FLIPP = 'https://backflipp.wishabi.com/flipp';
+
+/**
+ * The weekly ad, via the circular platform that renders it.
+ *
+ * Discovery found it here after proving Publix's own savings API carries only
+ * digital coupons. Two things matter for correctness:
+ *
+ *  - The search is keyed by postal code across *every* merchant in the area,
+ *    so results must be filtered to Publix or the list fills with other
+ *    shops' offers.
+ *  - Titles arrive with the offer and footnote markers inline
+ *    ("Campari Tomatoes† BOGO*"), which have to come off before the names can
+ *    match the catalogue.
+ */
+async function fetchWeeklyAd(postal) {
+  const merchants = selectRows(await getJson(`${FLIPP}/merchants?locale=en-us&postal_code=${postal}`));
+  const publix = merchants.filter((m) =>
+    /^publix$/i.test(String(m.name_identifier ?? '').trim()) ||
+    /^publix\b/i.test(String(m.name ?? '').trim()),
+  );
+  if (!publix.length) {
+    throw new Error(`no Publix merchant found among ${merchants.length} for postal code ${postal}`);
+  }
+  const ids = new Set(publix.map((m) => m.id));
+  log(`  matched ${publix.length} Publix merchant(s): ${publix.map((m) => `${m.name}#${m.id}`).join(', ')}`);
+
+  const items = selectRows(
+    await getJson(`${FLIPP}/items/search?locale=en-us&postal_code=${postal}&q=bogo&limit=500`),
+  );
+  const mine = items.filter((i) => ids.has(i.merchant_id));
+  log(`  ${items.length} rows in the area, ${mine.length} from Publix`);
+
+  const deals = [];
+  const seen = new Set();
+  for (const row of mine) {
+    const raw = pick(row, TITLE_KEYS);
+    if (!raw || !isBogoText(decodeEntities(raw))) continue;
+    const title = cleanTitle(raw);
+    if (!title) continue;
+    const key = title.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    deals.push({
+      id: String(row.flyer_item_id ?? row.id ?? key.replace(/[^a-z0-9]+/g, '-').slice(0, 60)),
+      title,
+      brand: null,
+      category: 'Weekly ad',
+      savings: 'BOGO',
+    });
+  }
+  return deals;
+}
+
 async function main() {
   if (args.discover) {
     await discover();
@@ -228,6 +282,22 @@ async function main() {
   const failures = [];
   const results = [];
 
+  // The weekly ad is the thing people mean by "the BOGOs", so try it first.
+  if (POSTAL) {
+    try {
+      log(`fetching the weekly ad for postal code ${POSTAL}`);
+      const deals = await fetchWeeklyAd(POSTAL);
+      if (deals.length) results.push({ deals, url: `${FLIPP}/items/search`, name: 'weekly ad' });
+      else failures.push('weekly ad: reached it, but no Publix BOGO rows');
+    } catch (err) {
+      failures.push(`weekly ad: ${err.message}`);
+      log(`  → ${err.message}`);
+    }
+  } else {
+    log('WARNING: no postal code set, so the weekly ad cannot be fetched.');
+    console.log('::warning title=No postal code::Set PUBLIX_POSTAL_CODE to fetch the weekly-ad BOGOs.');
+  }
+
   // Try every candidate rather than stopping at the first that returns JSON:
   // several of them answer, and the one that answers first is not necessarily
   // the one carrying the weekly ad.
@@ -248,11 +318,18 @@ async function main() {
 
   if (results.length) {
     results.sort((a, b) => b.deals.length - a.deals.length);
-    const best = results[0];
-    if (results.length > 1) {
-      log(`picked ${best.name} (${best.deals.length} deals) over ${results.length - 1} other source(s)`);
+    const merged = [];
+    const seen = new Set();
+    for (const result of results) {
+      for (const deal of result.deals) {
+        const key = deal.title.toLowerCase();
+        if (seen.has(key)) continue;
+        seen.add(key);
+        merged.push(deal);
+      }
     }
-    await publish(best.deals, best.url);
+    log(`combined ${results.map((r) => `${r.name}: ${r.deals.length}`).join(', ')} → ${merged.length} unique`);
+    await publish(merged, results.map((r) => r.url).join(' + '));
     return;
   }
 
@@ -373,7 +450,9 @@ function decodeEntities(text) {
  */
 function isBogoText(text) {
   const t = text.toLowerCase();
-  if (/\bbogo\b|\bb1g1\b|buy\s*1\s*get\s*1/.test(t)) return true;
+  // No word boundary before "bogo": titles arrive as "Ramen BOGO*" and also
+  // as "RamenBOGO*". The string is distinctive enough to match bare.
+  if (/bogo|\bb1g1\b|buy\s*1\s*get\s*1/.test(t)) return true;
   // "buy ... free" in that order covers the long-form phrasing.
   return /\bbuy\b/.test(t) && /\bfree\b/.test(t);
 }
@@ -402,23 +481,34 @@ function rowText(row) {
  * Turn an arbitrary payload into deals, and report enough about what was seen
  * for the Action log to be diagnostic when the shape changes again.
  */
-function normalise(payload) {
-  const arrays = collectArrays(payload);
-  const report = { rows: 0, textBogo: 0, typedBogo: 0, skipped: [], keys: [] };
-  if (!arrays.length) return { deals: [], report };
-
-  // Prefer the array whose entries most often carry a usable title.
-  const scored = arrays
+/** The array in an arbitrary payload most likely to be the list of records. */
+function selectRows(payload) {
+  const scored = collectArrays(payload)
     .map((arr) => {
       const objs = arr.filter((v) => v && typeof v === 'object' && !Array.isArray(v));
       return { arr: objs, score: objs.filter((o) => pick(o, TITLE_KEYS)).length };
     })
     .filter((c) => c.score > 0)
     .sort((a, b) => b.score - a.score);
+  return scored.length ? scored[0].arr : [];
+}
 
-  if (!scored.length) return { deals: [], report };
+/**
+ * Weekly-ad titles carry the offer and footnote markers inline —
+ * "Campari Tomatoes† BOGO*". Strip those so the name matches the catalogue.
+ */
+function cleanTitle(title) {
+  return decodeEntities(title)
+    .replace(/\s*bogo\b\s*\*?/gi, ' ')
+    .replace(/[†‡*]/g, '')
+    .replace(/\s{2,}/g, ' ')
+    .trim();
+}
 
-  const rows = scored[0].arr;
+function normalise(payload) {
+  const report = { rows: 0, textBogo: 0, typedBogo: 0, skipped: [], keys: [] };
+  const rows = selectRows(payload);
+  if (!rows.length) return { deals: [], report };
   report.rows = rows.length;
   report.keys = Object.keys(rows[0] ?? {});
 
@@ -474,7 +564,7 @@ function normalise(payload) {
       id: pick(row, ID_KEYS) ?? key.replace(/[^a-z0-9]+/g, '-').slice(0, 60),
       title,
       brand: decodeEntities(pick(row, BRAND_KEYS) ?? '') || null,
-      category: decodeEntities(pick(row, CATEGORY_KEYS) ?? '') || null,
+      category: decodeEntities(pick(row, CATEGORY_KEYS) ?? '') || 'Digital coupon',
       savings: decodeEntities(pick(row, SAVINGS_KEYS) ?? '') || null,
     });
   }
