@@ -45,14 +45,31 @@ jobs:
         with:
           node-version: '20'
 
+      - name: Report which settings the job can see
+        env:
+          V_POSTAL: ${{ vars.PUBLIX_POSTAL_CODE }}
+          S_POSTAL: ${{ secrets.PUBLIX_POSTAL_CODE }}
+          V_POSTAL_ALT: ${{ vars.PUBLIC_POSTAL_CODE }}
+          V_STORE: ${{ vars.PUBLIX_STORE_NUMBER }}
+        run: |
+          # Report presence only, never the values.
+          echo "PUBLIX_POSTAL_CODE  variable: ${V_POSTAL:+set}${V_POSTAL:-MISSING}"
+          echo "PUBLIX_POSTAL_CODE  secret:   ${S_POSTAL:+set}${S_POSTAL:-missing}"
+          echo "PUBLIC_POSTAL_CODE  variable: ${V_POSTAL_ALT:+set}${V_POSTAL_ALT:-missing}"
+          echo "PUBLIX_STORE_NUMBER variable: ${V_STORE:+set}${V_STORE:-missing}"
+          if [ -z "${V_POSTAL}${S_POSTAL}${V_POSTAL_ALT}" ]; then
+            echo "::warning title=No postal code visible::The weekly-ad BOGOs will be skipped. Add a repository variable named PUBLIX_POSTAL_CODE under Settings → Secrets and variables → Actions → Variables."
+          fi
+
       # Read-only reconnaissance: reports what every candidate endpoint returns
       # so the right one can be picked out of a single log, instead of one
       # guess per CI round trip. Writes nothing and deploys nothing.
       - name: Probe Publix endpoints
         if: ${{ inputs.discover }}
         env:
-          PUBLIX_STORE_NUMBER: ${{ inputs.store || vars.PUBLIX_STORE_NUMBER }}
-          PUBLIX_POSTAL_CODE: ${{ inputs.postal || vars.PUBLIX_POSTAL_CODE }}
+          PUBLIX_STORE_NUMBER: ${{ inputs.store || vars.PUBLIX_STORE_NUMBER || secrets.PUBLIX_STORE_NUMBER }}
+          PUBLIX_POSTAL_CODE: ${{ inputs.postal || vars.PUBLIX_POSTAL_CODE || secrets.PUBLIX_POSTAL_CODE }}
+          PUBLIC_POSTAL_CODE: ${{ vars.PUBLIC_POSTAL_CODE || secrets.PUBLIC_POSTAL_CODE }}
         run: node scripts/fetch-publix-bogos.mjs --discover
 
       # The script never exits non-zero for an unreachable feed: it records the
@@ -61,9 +78,11 @@ jobs:
       - name: Fetch this week's BOGO deals
         if: ${{ !inputs.discover }}
         env:
-          PUBLIX_STORE_NUMBER: ${{ inputs.store || vars.PUBLIX_STORE_NUMBER }}
-          # The weekly ad is keyed by postal code, not store number.
-          PUBLIX_POSTAL_CODE: ${{ inputs.postal || vars.PUBLIX_POSTAL_CODE }}
+          PUBLIX_STORE_NUMBER: ${{ inputs.store || vars.PUBLIX_STORE_NUMBER || secrets.PUBLIX_STORE_NUMBER }}
+          # The weekly ad is keyed by postal code, not store number. Read from
+          # both tabs, and tolerate the near-miss spelling.
+          PUBLIX_POSTAL_CODE: ${{ inputs.postal || vars.PUBLIX_POSTAL_CODE || secrets.PUBLIX_POSTAL_CODE }}
+          PUBLIC_POSTAL_CODE: ${{ vars.PUBLIC_POSTAL_CODE || secrets.PUBLIC_POSTAL_CODE }}
         run: node scripts/fetch-publix-bogos.mjs --out data/bogos.json
 
       - name: Commit if the feed changed

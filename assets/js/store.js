@@ -31,6 +31,10 @@ const defaultState = () => ({
   trips: [],
   /** manually entered deals, for when the Publix feed is unavailable */
   manualDeals: [],
+  /** receipt text -> catalog item id, taught once in the import review */
+  aliases: {},
+  /** fingerprint -> { date, store, at }, so the same receipt is not imported twice */
+  importedReceipts: {},
   /** household members, named in the app rather than in code */
   people: DEFAULT_PEOPLE.map((p) => ({ ...p })),
   peopleUpdatedAt: 0,
@@ -252,6 +256,102 @@ export function addTrip({ date, itemIds }) {
   return trip;
 }
 
+/**
+ * Fold a parsed receipt into the trip history.
+ *
+ * Trips are keyed by date rather than by receipt, because a single shopping
+ * trip routinely spans two stores — the Publix receipt and the Walmart one
+ * belong to the same outing. Importing a second receipt for a date that
+ * already has a trip merges into it and records both stores, rather than
+ * inventing a second trip that would halve the apparent trip size.
+ */
+/** The lines already recorded for a date, so an import can spot repeats. */
+export function tripLinesOn(date) {
+  return state.trips.find((t) => t.date === date)?.items ?? [];
+}
+
+export function receiptAlreadyImported(fingerprint) {
+  return state.importedReceipts[fingerprint] ?? null;
+}
+
+export function importReceipt({ date, store, lines, totalCents = null, fingerprint = null }) {
+  if (!date || !lines?.length) return null;
+  const byId = new Map(items().map((i) => [i.id, i]));
+
+  const bought = lines
+    .map((line) => {
+      const item = byId.get(line.itemId);
+      if (!item) return null;
+      return {
+        id: item.id,
+        name: item.name,
+        qty: line.qty ?? 1,
+        dept: item.dept,
+        priceCents: line.priceCents ?? null,
+        store: store || null,
+      };
+    })
+    .filter(Boolean);
+  if (!bought.length) return null;
+
+  let trip = state.trips.find((t) => t.date === date);
+  if (!trip) {
+    trip = { id: `trip-${date}-${Math.random().toString(36).slice(2, 7)}`, date, items: [] };
+    state.trips.push(trip);
+  }
+
+  for (const line of bought) {
+    // An item checked off the list carries no price. The receipt is telling us
+    // what that same purchase cost, so fill it in rather than recording the
+    // thing twice — this is the shop-with-the-list-then-share-the-receipt path.
+    const unpriced = trip.items.find((i) => i.id === line.id && i.priceCents == null);
+    if (unpriced) {
+      unpriced.priceCents = line.priceCents;
+      unpriced.store = line.store;
+      // The receipt is the authoritative record of how many were bought.
+      unpriced.qty = line.qty;
+    } else {
+      trip.items.push(line);
+    }
+  }
+
+  trip.stores = [...new Set(trip.items.map((i) => i.store).filter(Boolean))];
+  if (totalCents != null) {
+    trip.totalsByStore = { ...(trip.totalsByStore || {}), [store || 'Unknown']: totalCents };
+    trip.totalCents = Object.values(trip.totalsByStore).reduce((a, b) => a + b, 0);
+  }
+
+  if (fingerprint) {
+    state.importedReceipts[fingerprint] = {
+      date,
+      store: store || null,
+      at: new Date().toISOString(),
+    };
+  }
+
+  state.trips.sort((a, b) => a.date.localeCompare(b.date));
+  emit();
+  return trip;
+}
+
+/** Remember what a receipt's wording maps to, so the next one is automatic. */
+export function learnAliases(map) {
+  let learned = 0;
+  for (const [key, itemId] of Object.entries(map)) {
+    if (!key || !itemId) continue;
+    if (state.aliases[key] === itemId) continue;
+    state.aliases[key] = itemId;
+    learned++;
+  }
+  if (learned) emit();
+  return learned;
+}
+
+export function forgetAlias(key) {
+  delete state.aliases[key];
+  emit();
+}
+
 export function deleteTrip(id) {
   state.trips = state.trips.filter((t) => t.id !== id);
   if (!state.tripsRemoved.includes(id)) state.tripsRemoved.push(id);
@@ -449,6 +549,8 @@ const SHARED_FIELDS = [
   'deptOverrides',
   'trips',
   'manualDeals',
+  'aliases',
+  'importedReceipts',
   'people',
   'peopleUpdatedAt',
 ];
@@ -517,6 +619,8 @@ export function mergeShared(remote) {
     tripsRemoved,
     trips,
     customs: [...customsById.values()],
+    aliases: { ...(remote.aliases || {}), ...state.aliases },
+    importedReceipts: { ...(remote.importedReceipts || {}), ...state.importedReceipts },
     manualDeals: [...dealsById.values()],
     archived: [...new Set([...(remote.archived || []), ...state.archived])],
     overrides: { ...(remote.overrides || {}), ...state.overrides },

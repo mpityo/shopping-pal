@@ -15,6 +15,8 @@ It answers the things Notes could not:
   the things you actually buy.
 - **One list for everyone.** An encrypted file in this repo, opened by an
   invite link — every phone in the house sees the same list.
+- **Receipt import.** Paste or photograph a receipt to record a trip, with
+  prices, so the trends have real history and real spend behind them.
 
 ## Using it
 
@@ -25,6 +27,52 @@ It answers the things Notes could not:
 | **BOGOs** | The Publix ad, with your regulars called out. |
 | **Trends** | Everything computed from finished trips. |
 | **Setup** | Who's in the household, the shared list, the store route, and export/import of your data. |
+
+## Importing receipts
+
+Three ways in:
+
+- **Share it from Android.** Once the app is installed to the home screen it
+  appears in the system share sheet. Share a receipt PDF straight from Gmail or
+  the store's app and the importer opens with it already loaded.
+- **Trends → Import a receipt**, then choose a PDF or photo. Emailed receipts
+  are usually text PDFs, and their text is read directly — as accurate as
+  pasting.
+- **Paste the text.** Always works, needs nothing downloaded.
+
+Everything is read on your device. PDFs and photos are never uploaded, and
+nothing is written to the repo except the extracted lines, inside the encrypted
+vault.
+
+Every line is reviewed before anything is recorded. That is deliberate: trips
+are the only source for every trend, so one mis-parsed line quietly corrupts
+the numbers the app exists to produce. The review screen shows what was matched
+confidently, what it is unsure about, and what needs picking.
+
+**Corrections are remembered.** `GV SHRD MOZZ` is never going to fuzzy-match
+shredded cheese, so fix it once and every future receipt maps it automatically.
+Setup lists what has been learned, in case something needs unlearning.
+
+**Two stores, one trip.** Importing a second receipt with the same date merges
+into that trip rather than creating another, so a Publix run and a Walmart run
+count as one outing — with each line tagged by store and spend split between
+them.
+
+**Shop with the list, then share the receipt.** This is the normal way round,
+and it is handled properly: items you checked off already count as bought, so a
+receipt line matching one of them fills in what it cost rather than recording
+the purchase twice. Lines the receipt has and the list did not are added.
+Things you checked off that are not on this receipt are named and left alone —
+usually the other shop's half of the trip.
+
+**Nothing gets double-counted.** Sharing the same receipt twice is easy to do
+from a phone, so each one is fingerprinted: re-importing says so plainly. Lines
+already recorded *with a price* are flagged and unticked, and you can tick one
+back on if you really did buy two.
+
+Before importing, the app checks its own arithmetic: items, minus savings, plus
+tax should equal the printed total. If it doesn't, it says so, because that
+usually means a line was misread.
 
 **Finishing a trip is what makes the trends work.** Checked items are recorded
 as bought and cleared; unchecked items stay on the list. Nothing you did not
@@ -188,6 +236,9 @@ assets/js/app.js               router + shell rendering
 assets/js/store.js             state, persistence, actions
 assets/js/insights.js          cadence and trend maths
 assets/js/deals-data.js        BOGO feed loading + catalog matching
+assets/js/receipts.js          receipt parsing, matching, reconciliation
+assets/js/ocr.js               optional photo OCR, loaded only when used
+assets/js/pdf.js               PDF text extraction, loaded only when used
 assets/js/crypto.js            key generation + encryption for the shared list
 assets/js/sync.js              reading/writing the shared file on GitHub
 assets/js/data/catalog.js      the seed list from Notes

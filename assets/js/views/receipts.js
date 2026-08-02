@@ -1,0 +1,554 @@
+/**
+ * Receipt import.
+ *
+ * Every line is reviewed before anything is written. Trips are the only source
+ * for every trend in the app, so a mis-parsed line does not just look untidy —
+ * it quietly corrupts the numbers the app exists to produce. Nothing here
+ * imports without a human looking at it.
+ *
+ * Corrections are remembered. "GV SHRD MOZZ" will never fuzzy-match shredded
+ * cheese, so the review step doubles as teaching: fix it once and every future
+ * receipt maps it without asking.
+ */
+import { h, modal, toast, pluralize, matchScore } from '../util.js';
+import * as store from '../store.js';
+import {
+  parseReceipt,
+  matchLines,
+  formatMoney,
+  aliasKey,
+  receiptFingerprint,
+  classifyAgainstTrip,
+} from '../receipts.js';
+import * as ocr from '../ocr.js';
+import * as pdf from '../pdf.js';
+
+const STORES = ['Publix', 'Walmart', 'Target', 'Aldi', 'Costco', 'Other'];
+
+/**
+ * Turn whatever was handed over — PDF, photo, or plain text — into receipt
+ * text. PDFs try their text layer first and fall back to OCR when there is
+ * none, which is what a scanned receipt looks like.
+ */
+export async function extractText(file, onStatus = () => {}) {
+  if (!file) return '';
+
+  if (typeof file === 'string') return file;
+
+  if (file.type?.startsWith('text/')) {
+    onStatus('Reading…');
+    return file.text();
+  }
+
+  if (pdf.isPdf(file)) {
+    onStatus('Opening the PDF…');
+    const { text, scanned } = await pdf.readPdf(file, {
+      ocr,
+      onProgress: (_, message) => onStatus(message),
+    });
+    if (scanned) toast('That PDF was a scan, so it was read as an image — check the lines');
+    return text;
+  }
+
+  onStatus('Preparing the image…');
+  const prepared = await ocr.prepareImage(file);
+  onStatus('Downloading the reader (first time only)…');
+  return ocr.readImage(prepared, (p) => onStatus(`Reading the receipt… ${Math.round(p * 100)}%`));
+}
+
+export function openImporter(ctx, { initialFile = null, initialText = '' } = {}) {
+  const textarea = h('textarea', {
+    id: 'receipt-text',
+    rows: 10,
+    placeholder:
+      'Paste the receipt text here.\n\nPublix and Walmart both email receipts, and both apps show them — copy the whole thing, including the totals.',
+    style: { fontFamily: 'var(--mono)', fontSize: '0.8rem' },
+  });
+
+  const fileInput = h('input', {
+    type: 'file',
+    id: 'receipt-photo',
+    accept: 'application/pdf,image/*,text/plain',
+    onChange: (e) => e.target.files?.[0] && readFile(e.target.files[0]),
+  });
+
+  const status = h('p', { class: 'hint' });
+  const error = h('p', { class: 'hint', style: { color: 'var(--alert)' } });
+
+  async function readFile(file) {
+    error.textContent = '';
+    try {
+      const text = await extractText(file, (message) => {
+        status.textContent = message;
+      });
+      status.textContent = '';
+      if (!text.trim()) {
+        error.textContent =
+          'Nothing readable came out of that. Try better light for a photo, or paste the text instead.';
+        return;
+      }
+      textarea.value = text;
+      toast('Receipt read — check the text, then continue');
+    } catch (err) {
+      status.textContent = '';
+      error.textContent = err.message;
+    }
+  }
+
+  if (initialFile) readFile(initialFile);
+  if (initialText) textarea.value = initialText;
+
+  const dialog = modal(
+    'Import a receipt',
+    h(
+      'div',
+      {},
+      h(
+        'p',
+        { class: 'hint' },
+        'Turns a receipt into a recorded trip, so the trends have real history to work from. Photos are read on your device and never uploaded.',
+      ),
+      h('div', { class: 'field' }, h('label', { for: 'receipt-text' }, 'Receipt text'), textarea),
+      h(
+        'div',
+        { class: 'field' },
+        h('label', { for: 'receipt-photo' }, '…or choose a PDF or photo'),
+        h(
+          'p',
+          { class: 'hint' },
+          'Emailed receipts are usually PDFs, and their text is read directly — as accurate as pasting. Photos of thermal paper need correcting more often. On Android you can share a receipt straight into this app from the share menu.',
+        ),
+        fileInput,
+      ),
+      status,
+      error,
+      h(
+        'div',
+        { class: 'btn-row' },
+        h(
+          'button',
+          {
+            class: 'btn btn--primary',
+            onClick: () => {
+              const parsed = parseReceipt(textarea.value);
+              if (!parsed.lines.length) {
+                error.textContent =
+                  'No item lines found. Make sure the text includes the item names with their prices.';
+                return;
+              }
+              dialog.close();
+              openReview(ctx, parsed);
+            },
+          },
+          'Read the receipt',
+        ),
+        h('button', { class: 'btn btn--ghost', onClick: () => dialog.close() }, 'Cancel'),
+      ),
+    ),
+    { wide: true },
+  );
+}
+
+// ── Review ───────────────────────────────────────────────────────────────
+
+function openReview(ctx, parsed) {
+  const catalog = store.items();
+  const aliases = store.getState().aliases;
+  const matched = matchLines(parsed.lines, catalog, aliases);
+
+  const fingerprint = receiptFingerprint(parsed);
+  const alreadyImported = store.receiptAlreadyImported(fingerprint);
+  const initialDate = parsed.date ?? new Date().toISOString().slice(0, 10);
+
+  const dateInput = h('input', {
+    type: 'date',
+    id: 'receipt-date',
+    value: initialDate,
+    max: new Date().toISOString().slice(0, 10),
+    onChange: () => refreshDuplicates(),
+  });
+  const storeSelect = h(
+    'select',
+    { id: 'receipt-store', onChange: () => refreshDuplicates() },
+    STORES.map((s) => h('option', { value: s, selected: s === parsed.store }, s)),
+  );
+
+  /** One row of editable state per parsed line. */
+  const rows = matched.map((m) => ({
+    ...m,
+    include: true,
+    qty: m.line.qty,
+    status: 'new',
+    // Remember whether the mapping was chosen by hand, so only real decisions
+    // are learned as aliases.
+    taught: false,
+  }));
+
+  const summary = h('p', { class: 'dept-note' });
+  const dupNotice = h('div', {});
+  const tableBody = h('tbody', {});
+
+  /**
+   * Re-check the parsed lines against whatever is already recorded for the
+   * chosen date. Sharing the same receipt twice is easy to do from a phone,
+   * and appending a second Walmart run to an existing trip is a normal thing
+   * to want — so duplicates are flagged and pre-excluded rather than either
+   * silently doubled or silently dropped.
+   */
+  function refreshDuplicates() {
+    const existing = store.tripLinesOn(dateInput.value);
+    const { rows: flagged, uncovered } = classifyAgainstTrip(
+      rows.map((r) => ({ ...r, store: storeSelect.value })),
+      existing,
+    );
+
+    const counts = { enrich: 0, duplicate: 0, new: 0 };
+    flagged.forEach((f, i) => {
+      const row = rows[i];
+      const changed = row.status !== f.status;
+      row.status = f.status;
+      counts[f.status]++;
+      // Only auto-toggle when the classification actually changed, so a
+      // deliberate override survives the next refresh.
+      if (changed) {
+        row.include = f.status !== 'duplicate';
+        const box = tableBody.children[i]?.querySelector('input[type="checkbox"]');
+        if (box) box.checked = row.include;
+        if (tableBody.children[i]) {
+          tableBody.children[i].style.opacity = row.include ? '1' : '0.45';
+        }
+      }
+      if (tableBody.children[i]) {
+        tableBody.children[i].style.background =
+          f.status === 'duplicate'
+            ? 'var(--alert-tint)'
+            : row.confidence !== 'high' && row.confidence !== 'alias'
+              ? 'var(--deal-tint)'
+              : '';
+      }
+      const note = tableBody.children[i]?.querySelector('[data-note]');
+      if (note) note.textContent = noteFor(row);
+    });
+
+    const messages = [];
+    if (counts.enrich) {
+      messages.push(
+        h(
+          'div',
+          { class: 'notice' },
+          h(
+            'strong',
+            {},
+            `${pluralize(counts.enrich, 'line')} ${counts.enrich === 1 ? 'matches' : 'match'} what you checked off`,
+          ),
+          'Those already count as bought — the receipt is filling in what they cost, not adding them again.',
+        ),
+      );
+    }
+    if (counts.duplicate) {
+      messages.push(
+        h(
+          'div',
+          { class: 'notice notice--warn' },
+          h(
+            'strong',
+            {},
+            `${pluralize(counts.duplicate, 'line')} already recorded with a price`,
+          ),
+          'Unticked below. Tick one only if you genuinely bought it twice.',
+        ),
+      );
+    }
+    if (uncovered.length) {
+      messages.push(
+        h(
+          'div',
+          { class: 'notice' },
+          h(
+            'strong',
+            {},
+            `${pluralize(uncovered.length, 'checked-off item')} not on this receipt`,
+          ),
+          `${uncovered
+            .slice(0, 8)
+            .map((l) => l.name)
+            .join(', ')}${uncovered.length > 8 ? '…' : ''} — left as they are. If it was a two-shop trip, share the other receipt too.`,
+        ),
+      );
+    }
+    dupNotice.replaceChildren(...messages);
+    refreshSummary();
+  }
+
+  function noteFor(row) {
+    if (row.status === 'duplicate') return 'already recorded with a price';
+    if (row.status === 'enrich') return 'you checked this off — adding the price';
+    if (row.confidence === 'alias') return 'learned previously';
+    if (row.confidence === 'high') return 'matched';
+    if (row.confidence === 'low') return 'unsure — please check';
+    return 'no match — pick one';
+  }
+
+  function refreshSummary() {
+    const kept = rows.filter((r) => r.include && r.itemId);
+    const cents = kept.reduce((sum, r) => sum + r.line.priceCents, 0);
+    const unmatched = rows.filter((r) => r.include && !r.itemId).length;
+    const adding = kept.filter((r) => r.status === 'new').length;
+    const pricing = kept.filter((r) => r.status === 'enrich').length;
+    summary.replaceChildren(
+      h(
+        'span',
+        { dataset: { summary: '1' } },
+        `${pluralize(kept.length, 'line')} ready · ${formatMoney(cents)}`,
+        pricing ? ` · ${pricing} pricing what you checked off` : '',
+        adding ? ` · ${adding} new to the trip` : '',
+        unmatched ? ` · ${unmatched} still need an item` : '',
+      ),
+    );
+  }
+
+  function itemPicker(row) {
+    // Candidates first, then everything else, so the likely answer is at hand
+    // without hiding the rest of the catalog.
+    const ranked = [
+      ...row.candidates,
+      ...catalog
+        .filter((i) => !row.candidates.some((c) => c.id === i.id))
+        .sort((a, b) => a.name.localeCompare(b.name)),
+    ];
+    const select = h(
+      'select',
+      {
+        'aria-label': `Item for ${row.line.name}`,
+        onChange: (e) => {
+          row.itemId = e.target.value || null;
+          row.taught = Boolean(e.target.value);
+          refreshSummary();
+        },
+      },
+      h('option', { value: '' }, '— skip this line —'),
+      ranked.map((item) =>
+        h(
+          'option',
+          { value: item.id, selected: item.id === row.itemId },
+          row.candidates.some((c) => c.id === item.id) ? `★ ${item.name}` : item.name,
+        ),
+      ),
+    );
+    return select;
+  }
+
+  for (const row of rows) {
+    const tr = h(
+      'tr',
+      {},
+      h(
+        'td',
+        {},
+        h('input', {
+          type: 'checkbox',
+          class: 'check',
+          checked: true,
+          'aria-label': `Include ${row.line.name}`,
+          style: { width: '20px', height: '20px' },
+          onChange: (e) => {
+            row.include = e.target.checked;
+            tr.style.opacity = e.target.checked ? '1' : '0.45';
+            refreshSummary();
+          },
+        }),
+      ),
+      h(
+        'td',
+        { style: { whiteSpace: 'normal', maxWidth: '14rem' } },
+        h('div', {}, row.line.name),
+        h('div', { class: 'dept-note', dataset: { note: '1' } }, noteFor(row)),
+      ),
+      h('td', { class: 'num' }, String(row.qty)),
+      h('td', { class: 'num' }, formatMoney(row.line.priceCents)),
+      h('td', { style: { minWidth: '15rem' } }, itemPicker(row)),
+    );
+    if (row.confidence !== 'high' && row.confidence !== 'alias') {
+      tr.style.background = 'var(--deal-tint)';
+    }
+    tr.dataset.line = String(row.line.priceCents);
+    tableBody.append(tr);
+  }
+  refreshSummary();
+  refreshDuplicates();
+
+  const reconcile =
+    parsed.totalCents == null
+      ? null
+      : h(
+          'div',
+          { class: `notice${parsed.reconciles ? '' : ' notice--warn'}` },
+          h(
+            'strong',
+            {},
+            parsed.reconciles
+              ? `Lines add up to the printed total, ${formatMoney(parsed.totalCents)}`
+              : `Lines do not add up to the printed total`,
+          ),
+          `${formatMoney(parsed.itemsCents)} in items` +
+            (parsed.discountCents ? ` − ${formatMoney(parsed.discountCents)} savings` : '') +
+            (parsed.taxCents ? ` + ${formatMoney(parsed.taxCents)} tax` : '') +
+            ` = ${formatMoney(parsed.itemsCents - parsed.discountCents + parsed.taxCents)}` +
+            (parsed.reconciles
+              ? '.'
+              : `, but the receipt says ${formatMoney(parsed.totalCents)}. Something was probably misread — worth checking the lines below.`),
+        );
+
+  const dialog = modal(
+    'Check before importing',
+    h(
+      'div',
+      {},
+      alreadyImported
+        ? h(
+            'div',
+            { class: 'notice notice--warn' },
+            h('strong', {}, 'This exact receipt has been imported before'),
+            `It went in on ${alreadyImported.date}${alreadyImported.store ? ` as ${alreadyImported.store}` : ''}. Importing it again would double those items, so every line matching what is already recorded is unticked below.`,
+          )
+        : null,
+      reconcile,
+      dupNotice,
+      h(
+        'div',
+        { class: 'cols cols--2' },
+        h('div', { class: 'field' }, h('label', { for: 'receipt-date' }, 'Trip date'), dateInput),
+        h('div', { class: 'field' }, h('label', { for: 'receipt-store' }, 'Store'), storeSelect),
+      ),
+      h(
+        'p',
+        { class: 'hint' },
+        'Importing a second receipt with the same date merges into that trip — the Publix run and the Walmart run count as one outing.',
+      ),
+      h(
+        'div',
+        { class: 'table-wrap', style: { maxHeight: '45vh', overflowY: 'auto' } },
+        h(
+          'table',
+          {},
+          h(
+            'thead',
+            {},
+            h(
+              'tr',
+              {},
+              h('th', {}, ''),
+              h('th', {}, 'On the receipt'),
+              h('th', {}, 'Qty'),
+              h('th', {}, 'Price'),
+              h('th', {}, 'Is this…'),
+            ),
+          ),
+          tableBody,
+        ),
+      ),
+      h('div', { style: { margin: '0.75rem 0' } }, summary),
+      h(
+        'div',
+        { class: 'btn-row' },
+        h(
+          'button',
+          {
+            class: 'btn btn--primary',
+            onClick: () => {
+              const kept = rows.filter((r) => r.include && r.itemId);
+              if (!kept.length) {
+                toast('Nothing selected to import');
+                return;
+              }
+              const learned = {};
+              for (const row of kept) {
+                if (row.taught || row.confidence === 'high') {
+                  learned[aliasKey(row.line.name)] = row.itemId;
+                }
+              }
+              const count = store.learnAliases(learned);
+
+              const trip = store.importReceipt({
+                date: dateInput.value,
+                store: storeSelect.value,
+                totalCents: parsed.totalCents,
+                fingerprint,
+                lines: kept.map((r) => ({
+                  itemId: r.itemId,
+                  qty: r.qty,
+                  priceCents: r.line.priceCents,
+                })),
+              });
+              dialog.close();
+              if (trip) {
+                toast(
+                  `Imported ${pluralize(kept.length, 'item')} into ${trip.date}` +
+                    (count ? ` · learned ${pluralize(count, 'name')}` : ''),
+                );
+              }
+              ctx.rerender();
+            },
+          },
+          'Import into the trip',
+        ),
+        h('button', { class: 'btn btn--ghost', onClick: () => dialog.close() }, 'Cancel'),
+      ),
+    ),
+    { wide: true },
+  );
+}
+
+/** Lets a mis-taught mapping be undone without digging through a backup. */
+export function aliasManager(ctx) {
+  const aliases = store.getState().aliases;
+  const byId = new Map(store.items().map((i) => [i.id, i]));
+  const entries = Object.entries(aliases);
+
+  modal(
+    'Learned receipt names',
+    entries.length
+      ? h(
+          'div',
+          {},
+          h(
+            'p',
+            { class: 'hint' },
+            'What the app has been taught receipt wording means. Remove one to be asked again next time.',
+          ),
+          h(
+            'ul',
+            { class: 'rows' },
+            entries
+              .sort((a, b) => a[0].localeCompare(b[0]))
+              .map(([key, id]) =>
+                h(
+                  'li',
+                  { class: 'row' },
+                  h(
+                    'div',
+                    { class: 'row__main' },
+                    h('div', { class: 'row__name' }, key),
+                    h('div', { class: 'row__meta' }, `→ ${byId.get(id)?.name ?? '(removed item)'}`),
+                  ),
+                  h(
+                    'button',
+                    {
+                      class: 'icon-btn',
+                      type: 'button',
+                      'aria-label': `Forget ${key}`,
+                      onClick: (e) => {
+                        store.forgetAlias(key);
+                        e.target.closest('li').remove();
+                      },
+                    },
+                    '✕',
+                  ),
+                ),
+              ),
+          ),
+        )
+      : h('p', {}, 'Nothing learned yet. Import a receipt and correct any wrong matches — those corrections land here.'),
+    { wide: true },
+  );
+}

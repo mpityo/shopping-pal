@@ -24,7 +24,31 @@ import { dirname, resolve } from 'node:path';
 const args = parseArgs(process.argv.slice(2));
 const STORE = args.store ?? process.env.PUBLIX_STORE_NUMBER ?? '';
 const OUT = resolve(args.out ?? 'data/bogos.json');
-const POSTAL = args.postal ?? process.env.PUBLIX_POSTAL_CODE ?? '';
+/**
+ * The postal code decides whether the weekly ad can be fetched at all, and it
+ * is the single easiest thing to misconfigure — GitHub's settings page has
+ * separate tabs for Secrets and Variables, and only one of them feeds `vars`.
+ * Accept the obvious near-misses and say which one was found, so a silent
+ * "only 7 coupons" result cannot happen without an explanation in the log.
+ */
+const POSTAL_VARS = [
+  'PUBLIX_POSTAL_CODE',
+  'PUBLIC_POSTAL_CODE',
+  'POSTAL_CODE',
+  'PUBLIX_ZIP',
+  'ZIP_CODE',
+];
+
+function resolvePostal() {
+  if (args.postal) return { value: String(args.postal).trim(), from: '--postal' };
+  for (const name of POSTAL_VARS) {
+    const value = (process.env[name] ?? '').trim();
+    if (value) return { value, from: name };
+  }
+  return { value: '', from: null };
+}
+
+const { value: POSTAL, from: POSTAL_FROM } = resolvePostal();
 const TIMEOUT_MS = 20_000;
 
 const UA =
@@ -285,7 +309,7 @@ async function main() {
   // The weekly ad is the thing people mean by "the BOGOs", so try it first.
   if (POSTAL) {
     try {
-      log(`fetching the weekly ad for postal code ${POSTAL}`);
+      log(`fetching the weekly ad for postal code ${POSTAL} (from ${POSTAL_FROM})`);
       const deals = await fetchWeeklyAd(POSTAL);
       if (deals.length) results.push({ deals, url: `${FLIPP}/items/search`, name: 'weekly ad' });
       else failures.push('weekly ad: reached it, but no Publix BOGO rows');
@@ -294,8 +318,13 @@ async function main() {
       log(`  → ${err.message}`);
     }
   } else {
-    log('WARNING: no postal code set, so the weekly ad cannot be fetched.');
-    console.log('::warning title=No postal code::Set PUBLIX_POSTAL_CODE to fetch the weekly-ad BOGOs.');
+    log('WARNING: no postal code, so the weekly ad — most of the BOGOs — was skipped.');
+    log(`  Looked for: ${POSTAL_VARS.join(', ')}`);
+    log('  Set it under Settings → Secrets and variables → Actions → the');
+    log('  *Variables* tab (not Secrets), named PUBLIX_POSTAL_CODE.');
+    console.log(
+      '::warning title=No postal code::The weekly-ad BOGOs were skipped. Add a repository *variable* named PUBLIX_POSTAL_CODE.',
+    );
   }
 
   // Try every candidate rather than stopping at the first that returns JSON:

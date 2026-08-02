@@ -7,6 +7,7 @@ import { renderBrowse } from './views/browse.js';
 import { renderDeals } from './views/deals.js';
 import { renderTrends } from './views/trends.js';
 import { renderSettings } from './views/settings.js';
+import { openImporter } from './views/receipts.js';
 
 const ROUTES = [
   { id: 'list', label: 'This week', render: renderList },
@@ -216,11 +217,56 @@ function consumeSharedList() {
   }
 }
 
+/**
+ * Collect a receipt shared in from Android.
+ *
+ * The share arrives as a POST, which only the service worker can receive; it
+ * parks the file in a cache and redirects here with a ticket. Claim it, clear
+ * it, and open the importer — the file is deleted whether or not the import
+ * goes ahead, so nothing lingers on the device.
+ */
+async function consumeSharedReceipt() {
+  const ticket = hashParams().get('receipt');
+  if (!ticket) return;
+
+  // Strip the ticket immediately: a reload should not re-run the import.
+  history.replaceState(null, '', `${location.pathname}#/trends`);
+
+  if (ticket === 'failed') {
+    toast('That share did not contain anything readable');
+    return;
+  }
+
+  try {
+    const cache = await caches.open('shopping-pal-shared');
+    const key = new URL(`shared/${ticket}`, new URL('./', location.href)).href;
+    const response = await cache.match(key);
+    if (!response) {
+      toast('That shared receipt could not be found');
+      return;
+    }
+    await cache.delete(key);
+
+    const kind = response.headers.get('x-share-kind');
+    if (kind === 'text') {
+      openImporter(ctx, { initialText: await response.text() });
+      return;
+    }
+    const type = response.headers.get('content-type') || 'application/octet-stream';
+    const name = decodeURIComponent(response.headers.get('x-share-filename') || 'receipt');
+    const file = new File([await response.blob()], name, { type });
+    openImporter(ctx, { initialFile: file });
+  } catch (err) {
+    toast(`Could not open the shared receipt: ${err.message}`);
+  }
+}
+
 // ── Boot ─────────────────────────────────────────────────────────────────
 
 window.addEventListener('hashchange', () => {
   if (consumeInviteKey()) sync.resume();
   consumeSharedList();
+  consumeSharedReceipt();
   render();
   window.scrollTo({ top: 0 });
 });
@@ -237,6 +283,7 @@ sync.subscribe(() => renderSyncStatus());
 consumeInviteKey();
 consumeSharedList();
 render();
+consumeSharedReceipt();
 
 // Open the shared list: either from a key just handed over by an invite link,
 // or one this device already had.
