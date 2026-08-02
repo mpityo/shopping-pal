@@ -12,12 +12,51 @@
  */
 import { h, modal, toast, pluralize, matchScore } from '../util.js';
 import * as store from '../store.js';
-import { parseReceipt, matchLines, formatMoney, aliasKey } from '../receipts.js';
+import {
+  parseReceipt,
+  matchLines,
+  formatMoney,
+  aliasKey,
+  receiptFingerprint,
+  markDuplicates,
+} from '../receipts.js';
 import * as ocr from '../ocr.js';
+import * as pdf from '../pdf.js';
 
 const STORES = ['Publix', 'Walmart', 'Target', 'Aldi', 'Costco', 'Other'];
 
-export function openImporter(ctx) {
+/**
+ * Turn whatever was handed over — PDF, photo, or plain text — into receipt
+ * text. PDFs try their text layer first and fall back to OCR when there is
+ * none, which is what a scanned receipt looks like.
+ */
+export async function extractText(file, onStatus = () => {}) {
+  if (!file) return '';
+
+  if (typeof file === 'string') return file;
+
+  if (file.type?.startsWith('text/')) {
+    onStatus('Reading…');
+    return file.text();
+  }
+
+  if (pdf.isPdf(file)) {
+    onStatus('Opening the PDF…');
+    const { text, scanned } = await pdf.readPdf(file, {
+      ocr,
+      onProgress: (_, message) => onStatus(message),
+    });
+    if (scanned) toast('That PDF was a scan, so it was read as an image — check the lines');
+    return text;
+  }
+
+  onStatus('Preparing the image…');
+  const prepared = await ocr.prepareImage(file);
+  onStatus('Downloading the reader (first time only)…');
+  return ocr.readImage(prepared, (p) => onStatus(`Reading the receipt… ${Math.round(p * 100)}%`));
+}
+
+export function openImporter(ctx, { initialFile = null, initialText = '' } = {}) {
   const textarea = h('textarea', {
     id: 'receipt-text',
     rows: 10,
@@ -29,35 +68,35 @@ export function openImporter(ctx) {
   const fileInput = h('input', {
     type: 'file',
     id: 'receipt-photo',
-    accept: 'image/*',
-    capture: 'environment',
-    onChange: (e) => e.target.files?.[0] && runOcr(e.target.files[0]),
+    accept: 'application/pdf,image/*,text/plain',
+    onChange: (e) => e.target.files?.[0] && readFile(e.target.files[0]),
   });
 
   const status = h('p', { class: 'hint' });
   const error = h('p', { class: 'hint', style: { color: 'var(--alert)' } });
 
-  async function runOcr(file) {
+  async function readFile(file) {
     error.textContent = '';
-    status.textContent = 'Preparing the image…';
     try {
-      const prepared = await ocr.prepareImage(file);
-      status.textContent = 'Downloading the reader (first time only)…';
-      const text = await ocr.readImage(prepared, (p) => {
-        status.textContent = `Reading the receipt… ${Math.round(p * 100)}%`;
+      const text = await extractText(file, (message) => {
+        status.textContent = message;
       });
       status.textContent = '';
       if (!text.trim()) {
-        error.textContent = 'Nothing readable came out of that photo. Try better light, or paste the text instead.';
+        error.textContent =
+          'Nothing readable came out of that. Try better light for a photo, or paste the text instead.';
         return;
       }
       textarea.value = text;
-      toast('Photo read — check the text, then continue');
+      toast('Receipt read — check the text, then continue');
     } catch (err) {
       status.textContent = '';
       error.textContent = err.message;
     }
   }
+
+  if (initialFile) readFile(initialFile);
+  if (initialText) textarea.value = initialText;
 
   const dialog = modal(
     'Import a receipt',
@@ -73,11 +112,11 @@ export function openImporter(ctx) {
       h(
         'div',
         { class: 'field' },
-        h('label', { for: 'receipt-photo' }, '…or photograph a paper receipt'),
+        h('label', { for: 'receipt-photo' }, '…or choose a PDF or photo'),
         h(
           'p',
           { class: 'hint' },
-          'Pasted text is far more accurate. Photos of thermal paper need correcting more often.',
+          'Emailed receipts are usually PDFs, and their text is read directly — as accurate as pasting. Photos of thermal paper need correcting more often. On Android you can share a receipt straight into this app from the share menu.',
         ),
         fileInput,
       ),
@@ -117,15 +156,20 @@ function openReview(ctx, parsed) {
   const aliases = store.getState().aliases;
   const matched = matchLines(parsed.lines, catalog, aliases);
 
+  const fingerprint = receiptFingerprint(parsed);
+  const alreadyImported = store.receiptAlreadyImported(fingerprint);
+  const initialDate = parsed.date ?? new Date().toISOString().slice(0, 10);
+
   const dateInput = h('input', {
     type: 'date',
     id: 'receipt-date',
-    value: parsed.date ?? new Date().toISOString().slice(0, 10),
+    value: initialDate,
     max: new Date().toISOString().slice(0, 10),
+    onChange: () => refreshDuplicates(),
   });
   const storeSelect = h(
     'select',
-    { id: 'receipt-store' },
+    { id: 'receipt-store', onChange: () => refreshDuplicates() },
     STORES.map((s) => h('option', { value: s, selected: s === parsed.store }, s)),
   );
 
@@ -134,13 +178,76 @@ function openReview(ctx, parsed) {
     ...m,
     include: true,
     qty: m.line.qty,
+    duplicate: false,
     // Remember whether the mapping was chosen by hand, so only real decisions
     // are learned as aliases.
     taught: false,
   }));
 
   const summary = h('p', { class: 'dept-note' });
+  const dupNotice = h('div', {});
   const tableBody = h('tbody', {});
+
+  /**
+   * Re-check the parsed lines against whatever is already recorded for the
+   * chosen date. Sharing the same receipt twice is easy to do from a phone,
+   * and appending a second Walmart run to an existing trip is a normal thing
+   * to want — so duplicates are flagged and pre-excluded rather than either
+   * silently doubled or silently dropped.
+   */
+  function refreshDuplicates() {
+    const existing = store.tripLinesOn(dateInput.value);
+    const flagged = markDuplicates(
+      rows.map((r) => ({ ...r, store: storeSelect.value })),
+      existing,
+    );
+    let dupes = 0;
+    flagged.forEach((f, i) => {
+      const row = rows[i];
+      const wasDuplicate = row.duplicate;
+      row.duplicate = f.duplicate;
+      if (f.duplicate) dupes++;
+      // Only auto-toggle when the flag actually changed, so a deliberate
+      // override is not undone on the next refresh.
+      if (f.duplicate !== wasDuplicate) {
+        row.include = !f.duplicate;
+        const box = tableBody.children[i]?.querySelector('input[type="checkbox"]');
+        if (box) box.checked = row.include;
+        if (tableBody.children[i]) {
+          tableBody.children[i].style.opacity = row.include ? '1' : '0.45';
+        }
+      }
+      const note = tableBody.children[i]?.querySelector('[data-note]');
+      if (note) note.textContent = noteFor(row);
+    });
+
+    dupNotice.replaceChildren(
+      dupes
+        ? h(
+            'div',
+            { class: 'notice notice--warn' },
+            h('strong', {}, `${pluralize(dupes, 'line')} already recorded on this date`),
+            'They are unticked below. Tick one only if you genuinely bought it twice.',
+          )
+        : existing.length
+          ? h(
+              'div',
+              { class: 'notice' },
+              h('strong', {}, `Adding to an existing trip`),
+              `${pluralize(existing.length, 'item')} already recorded on this date — these will be added alongside.`,
+            )
+          : '',
+    );
+    refreshSummary();
+  }
+
+  function noteFor(row) {
+    if (row.duplicate) return 'already on this trip';
+    if (row.confidence === 'alias') return 'learned previously';
+    if (row.confidence === 'high') return 'matched';
+    if (row.confidence === 'low') return 'unsure — please check';
+    return 'no match — pick one';
+  }
 
   function refreshSummary() {
     const kept = rows.filter((r) => r.include && r.itemId);
@@ -211,17 +318,7 @@ function openReview(ctx, parsed) {
         'td',
         { style: { whiteSpace: 'normal', maxWidth: '14rem' } },
         h('div', {}, row.line.name),
-        h(
-          'div',
-          { class: 'dept-note' },
-          row.confidence === 'alias'
-            ? 'learned previously'
-            : row.confidence === 'high'
-              ? 'matched'
-              : row.confidence === 'low'
-                ? 'unsure — please check'
-                : 'no match — pick one',
-        ),
+        h('div', { class: 'dept-note', dataset: { note: '1' } }, noteFor(row)),
       ),
       h('td', { class: 'num' }, String(row.qty)),
       h('td', { class: 'num' }, formatMoney(row.line.priceCents)),
@@ -233,6 +330,7 @@ function openReview(ctx, parsed) {
     tableBody.append(tr);
   }
   refreshSummary();
+  refreshDuplicates();
 
   const reconcile =
     parsed.totalCents == null
@@ -261,7 +359,16 @@ function openReview(ctx, parsed) {
     h(
       'div',
       {},
+      alreadyImported
+        ? h(
+            'div',
+            { class: 'notice notice--warn' },
+            h('strong', {}, 'This exact receipt has been imported before'),
+            `It went in on ${alreadyImported.date}${alreadyImported.store ? ` as ${alreadyImported.store}` : ''}. Importing it again would double those items, so every line matching what is already recorded is unticked below.`,
+          )
+        : null,
       reconcile,
+      dupNotice,
       h(
         'div',
         { class: 'cols cols--2' },
@@ -321,6 +428,7 @@ function openReview(ctx, parsed) {
                 date: dateInput.value,
                 store: storeSelect.value,
                 totalCents: parsed.totalCents,
+                fingerprint,
                 lines: kept.map((r) => ({
                   itemId: r.itemId,
                   qty: r.qty,

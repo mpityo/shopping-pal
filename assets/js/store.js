@@ -33,6 +33,8 @@ const defaultState = () => ({
   manualDeals: [],
   /** receipt text -> catalog item id, taught once in the import review */
   aliases: {},
+  /** fingerprint -> { date, store, at }, so the same receipt is not imported twice */
+  importedReceipts: {},
   /** household members, named in the app rather than in code */
   people: DEFAULT_PEOPLE.map((p) => ({ ...p })),
   peopleUpdatedAt: 0,
@@ -263,7 +265,16 @@ export function addTrip({ date, itemIds }) {
  * already has a trip merges into it and records both stores, rather than
  * inventing a second trip that would halve the apparent trip size.
  */
-export function importReceipt({ date, store, lines, totalCents = null }) {
+/** The lines already recorded for a date, so an import can spot repeats. */
+export function tripLinesOn(date) {
+  return state.trips.find((t) => t.date === date)?.items ?? [];
+}
+
+export function receiptAlreadyImported(fingerprint) {
+  return state.importedReceipts[fingerprint] ?? null;
+}
+
+export function importReceipt({ date, store, lines, totalCents = null, fingerprint = null }) {
   if (!date || !lines?.length) return null;
   const byId = new Map(items().map((i) => [i.id, i]));
 
@@ -306,6 +317,14 @@ export function importReceipt({ date, store, lines, totalCents = null }) {
   if (totalCents != null) {
     trip.totalsByStore = { ...(trip.totalsByStore || {}), [store || 'Unknown']: totalCents };
     trip.totalCents = Object.values(trip.totalsByStore).reduce((a, b) => a + b, 0);
+  }
+
+  if (fingerprint) {
+    state.importedReceipts[fingerprint] = {
+      date,
+      store: store || null,
+      at: new Date().toISOString(),
+    };
   }
 
   state.trips.sort((a, b) => a.date.localeCompare(b.date));
@@ -529,6 +548,7 @@ const SHARED_FIELDS = [
   'trips',
   'manualDeals',
   'aliases',
+  'importedReceipts',
   'people',
   'peopleUpdatedAt',
 ];
@@ -598,6 +618,7 @@ export function mergeShared(remote) {
     trips,
     customs: [...customsById.values()],
     aliases: { ...(remote.aliases || {}), ...state.aliases },
+    importedReceipts: { ...(remote.importedReceipts || {}), ...state.importedReceipts },
     manualDeals: [...dealsById.values()],
     archived: [...new Set([...(remote.archived || []), ...state.archived])],
     overrides: { ...(remote.overrides || {}), ...state.overrides },

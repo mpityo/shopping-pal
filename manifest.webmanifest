@@ -33,5 +33,25 @@
       "type": "image/png",
       "purpose": "maskable"
     }
-  ]
+  ],
+  "share_target": {
+    "action": "share-receipt",
+    "method": "POST",
+    "enctype": "multipart/form-data",
+    "params": {
+      "title": "title",
+      "text": "text",
+      "url": "url",
+      "files": [
+        {
+          "name": "receipt",
+          "accept": [
+            "application/pdf",
+            "image/*",
+            "text/plain"
+          ]
+        }
+      ]
+    }
+  }
 }

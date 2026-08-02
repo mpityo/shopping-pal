@@ -241,6 +241,63 @@ export function matchLines(lines, catalog, aliases = {}) {
   });
 }
 
+/**
+ * A stable identifier for a receipt.
+ *
+ * Sharing the same PDF twice — easy to do from a phone — must not double the
+ * trip. Store, date, printed total and the item lines together identify a
+ * shopping run precisely enough: two genuine visits to the same shop on the
+ * same day would have to ring up an identical basket to collide.
+ */
+export function receiptFingerprint(parsed) {
+  const lines = parsed.lines
+    .map((l) => `${normalize(l.name)}:${l.priceCents}:${l.qty}`)
+    .sort()
+    .join('|');
+  return [
+    parsed.store ?? 'unknown',
+    parsed.date ?? 'undated',
+    parsed.totalCents ?? 'nototal',
+    parsed.lines.length,
+    hash(lines),
+  ].join('/');
+}
+
+/** Small non-cryptographic hash; this only needs to detect accidental repeats. */
+function hash(text) {
+  let h = 2166136261;
+  for (let i = 0; i < text.length; i++) {
+    h ^= text.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return (h >>> 0).toString(36);
+}
+
+/**
+ * Flag lines that already appear in the trip being appended to.
+ *
+ * Same item, same store, same price is treated as the same purchase rather
+ * than a second one — the common case is re-importing a receipt, not buying
+ * two identical things at identical prices and having them ring up separately.
+ */
+export function markDuplicates(rows, existingLines) {
+  const seen = new Map();
+  for (const line of existingLines ?? []) {
+    const key = `${line.id}:${line.store ?? ''}:${line.priceCents ?? ''}`;
+    seen.set(key, (seen.get(key) ?? 0) + 1);
+  }
+  return rows.map((row) => {
+    if (!row.itemId) return { ...row, duplicate: false };
+    const key = `${row.itemId}:${row.store ?? ''}:${row.line.priceCents}`;
+    const remaining = seen.get(key) ?? 0;
+    if (remaining > 0) {
+      seen.set(key, remaining - 1);
+      return { ...row, duplicate: true };
+    }
+    return { ...row, duplicate: false };
+  });
+}
+
 export function sumCents(lines) {
   return lines.reduce((total, l) => total + (l.priceCents ?? 0) * 1, 0);
 }

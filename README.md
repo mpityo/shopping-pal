@@ -30,9 +30,19 @@ It answers the things Notes could not:
 
 ## Importing receipts
 
-**Trends → Import a receipt.** Paste the text of a Publix or Walmart receipt
-(both email them, both show them in-app), or photograph a paper one — photos
-are read on your device and never uploaded.
+Three ways in:
+
+- **Share it from Android.** Once the app is installed to the home screen it
+  appears in the system share sheet. Share a receipt PDF straight from Gmail or
+  the store's app and the importer opens with it already loaded.
+- **Trends → Import a receipt**, then choose a PDF or photo. Emailed receipts
+  are usually text PDFs, and their text is read directly — as accurate as
+  pasting.
+- **Paste the text.** Always works, needs nothing downloaded.
+
+Everything is read on your device. PDFs and photos are never uploaded, and
+nothing is written to the repo except the extracted lines, inside the encrypted
+vault.
 
 Every line is reviewed before anything is recorded. That is deliberate: trips
 are the only source for every trend, so one mis-parsed line quietly corrupts
@@ -47,6 +57,11 @@ Setup lists what has been learned, in case something needs unlearning.
 into that trip rather than creating another, so a Publix run and a Walmart run
 count as one outing — with each line tagged by store and spend split between
 them.
+
+**Nothing gets double-counted.** Sharing the same receipt twice is easy to do
+from a phone, so each one is fingerprinted: re-importing says so plainly. Lines
+matching what is already recorded for that date are flagged and unticked, and
+you can tick one back on if you really did buy two.
 
 Before importing, the app checks its own arithmetic: items, minus savings, plus
 tax should equal the printed total. If it doesn't, it says so, because that
@@ -216,6 +231,7 @@ assets/js/insights.js          cadence and trend maths
 assets/js/deals-data.js        BOGO feed loading + catalog matching
 assets/js/receipts.js          receipt parsing, matching, reconciliation
 assets/js/ocr.js               optional photo OCR, loaded only when used
+assets/js/pdf.js               PDF text extraction, loaded only when used
 assets/js/crypto.js            key generation + encryption for the shared list
 assets/js/sync.js              reading/writing the shared file on GitHub
 assets/js/data/catalog.js      the seed list from Notes
