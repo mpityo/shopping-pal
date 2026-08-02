@@ -13,7 +13,7 @@
   --surface-2: #f2f1ea;
   --ink: #12171d;
   --ink-2: #4a5563;
-  --ink-3: #6c7787;
+  --ink-3: #5f6b7a; /* 4.5:1 on --surface; #6c7787 measured 4.01 */
   --line: #d8d5c9;
   --line-strong: #b4b0a1;
 
@@ -27,6 +27,12 @@
   --alert: #a5231b;
   --alert-tint: #fbeae8;
   --focus: #ffcf3d;
+
+  /* Always-dark surfaces (utility strip, toasts). These must NOT be derived
+     from --ink: that token inverts with the theme, which turned the top bar
+     white-on-white in dark mode. */
+  --bar-bg: #12171d;
+  --bar-fg: #e9ecef;
 
   --radius: 4px;
   --gutter: 1.25rem;
@@ -58,6 +64,11 @@
     --deal-tint: #2a1c11;
     --alert: #f28b82;
     --alert-tint: #2a1614;
+
+    /* Slightly darker than the page so the bar still reads as a distinct
+       band, rather than inverting to a white slab. */
+    --bar-bg: #0a0d11;
+    --bar-fg: #e6eaef;
   }
 }
 
@@ -136,8 +147,8 @@ a {
 /* ── Utility strip ─────────────────────────────────────────────────────── */
 
 .utility {
-  background: var(--ink);
-  color: #e9ecef;
+  background: var(--bar-bg);
+  color: var(--bar-fg);
   font-size: 0.75rem;
   letter-spacing: 0.02em;
 }
@@ -163,7 +174,7 @@ a {
 
 .utility a,
 .utility button {
-  color: #e9ecef;
+  color: var(--bar-fg);
   background: none;
   border: 0;
   font: inherit;
@@ -331,6 +342,14 @@ a {
 .nav__count--deal {
   background: var(--deal);
   color: #fff;
+}
+
+@media (prefers-color-scheme: dark) {
+  /* Must come after the rule above: equal specificity, so source order wins.
+     The dark-mode accent is a light orange, on which white is unreadable. */
+  .nav__count--deal {
+    color: #2a1c11;
+  }
 }
 
 /* ── Page ──────────────────────────────────────────────────────────────── */
@@ -1047,8 +1066,8 @@ textarea {
 }
 
 .toast {
-  background: var(--ink);
-  color: var(--paper);
+  background: var(--bar-bg);
+  color: var(--bar-fg);
   padding: 0.75rem 1rem;
   border-radius: var(--radius);
   display: flex;
