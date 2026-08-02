@@ -119,6 +119,89 @@ export function neverBought(trips, catalog) {
   return catalog.filter((i) => !seen.has(i.id));
 }
 
+// ── Spend ────────────────────────────────────────────────────────────────
+
+/**
+ * Spend figures, in integer cents.
+ *
+ * Only trips imported from receipts carry prices, so everything here reports
+ * how much of the history it is actually based on. A spend chart drawn from
+ * two of twenty trips would be worse than no chart at all.
+ */
+export function spendSummary(trips) {
+  const priced = trips.filter(
+    (t) => t.totalCents != null || t.items.some((i) => i.priceCents != null),
+  );
+
+  // Two different numbers live here and must not be conflated. What you paid
+  // is the printed total: it includes tax and is net of savings. Line prices
+  // are the only thing that can be broken down by department, but they sum to
+  // something else. Report the printed total as the headline, and label the
+  // breakdowns for what they are.
+  let paidCents = 0;
+  const paidByStore = new Map();
+  const lineByStore = new Map();
+  const byDept = new Map();
+  let lineCents = 0;
+  let lines = 0;
+
+  for (const trip of priced) {
+    const printed = trip.totalCents;
+    const totals = trip.totalsByStore;
+    if (printed != null) paidCents += printed;
+
+    if (totals) {
+      for (const [name, cents] of Object.entries(totals)) {
+        paidByStore.set(name, (paidByStore.get(name) ?? 0) + cents);
+      }
+    }
+
+    for (const item of trip.items) {
+      if (item.priceCents == null) continue;
+      lineCents += item.priceCents;
+      lines++;
+      const storeKey = item.store ?? 'Unrecorded';
+      lineByStore.set(storeKey, (lineByStore.get(storeKey) ?? 0) + item.priceCents);
+      byDept.set(item.dept, (byDept.get(item.dept) ?? 0) + item.priceCents);
+    }
+
+    if (printed == null) paidCents += trip.items.reduce((s, i) => s + (i.priceCents ?? 0), 0);
+  }
+
+  const byStore = paidByStore.size ? paidByStore : lineByStore;
+
+  return {
+    hasPrices: lines > 0 || paidCents > 0,
+    /** True when the headline figure is what the receipts actually charged. */
+    fromPrintedTotals: paidByStore.size > 0,
+    pricedTrips: priced.length,
+    totalTrips: trips.length,
+    totalCents: paidCents,
+    lineCents,
+    avgTripCents: priced.length ? Math.round(paidCents / priced.length) : 0,
+    byStore: [...byStore.entries()].sort((a, b) => b[1] - a[1]),
+    byDept: [...byDept.entries()].sort((a, b) => b[1] - a[1]),
+    series: priced.map((t) => ({
+      date: t.date,
+      label: formatShortDate(t.date),
+      cents: t.totalCents ?? t.items.reduce((sum, i) => sum + (i.priceCents ?? 0), 0),
+    })),
+  };
+}
+
+/** What an item has cost over time, for the "am I paying more?" question. */
+export function priceHistory(trips, itemId) {
+  const points = [];
+  for (const trip of trips) {
+    for (const item of trip.items) {
+      if (item.id !== itemId || item.priceCents == null) continue;
+      const qty = item.qty || 1;
+      points.push({ date: trip.date, unitCents: Math.round(item.priceCents / qty), store: item.store });
+    }
+  }
+  return points.sort((a, b) => a.date.localeCompare(b.date));
+}
+
 export function formatShortDate(iso) {
   const d = new Date(`${iso}T12:00:00`);
   return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });

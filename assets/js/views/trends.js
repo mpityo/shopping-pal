@@ -1,7 +1,10 @@
 import { h, pluralize, modal, toast } from '../util.js';
 import * as store from '../store.js';
 import { departmentName } from '../data/departments.js';
+import { openImporter, aliasManager } from './receipts.js';
+import { formatMoney } from '../receipts.js';
 import {
+  spendSummary,
   itemStats,
   topItems,
   tripSeries,
@@ -32,17 +35,14 @@ export function renderTrends(ctx) {
         h(
           'p',
           {},
-          'Trends come from finished trips, so there is nothing to chart until you check items off and tap “Finish trip”. After two or three trips the cadence and “probably due” suggestions start working.',
+          'Trends come from finished trips, so there is nothing to chart until you check items off and tap “Finish trip”. The quickest way to get real history is to import a few old receipts — that fills in what you bought, when, and what it cost.',
         ),
         h(
           'div',
           { class: 'btn-row', style: { justifyContent: 'center' } },
-          h('button', { class: 'btn btn--primary', onClick: () => ctx.go('list') }, 'Go to the list'),
-          h(
-            'button',
-            { class: 'btn btn--ghost', onClick: () => backfill(ctx) },
-            'Log a past trip',
-          ),
+          h('button', { class: 'btn btn--primary', onClick: () => openImporter(ctx) }, 'Import a receipt'),
+          h('button', { class: 'btn btn--ghost', onClick: () => backfill(ctx) }, 'Log a past trip'),
+          h('button', { class: 'btn btn--ghost', onClick: () => ctx.go('list') }, 'Go to the list'),
         ),
       ),
     );
@@ -85,6 +85,7 @@ export function renderTrends(ctx) {
       departmentCard(trips),
     ),
 
+    spendCard(ctx, trips),
     tripsCard(series),
     cadenceTable(ctx, stats),
     pruneCard(trips),
@@ -176,6 +177,106 @@ function departmentCard(trips) {
               h('span', { class: 'bar__fill bar__fill--deal', style: { width: `${(t.count / max) * 100}%` } }),
             ),
             h('span', { class: 'bar__value' }, String(t.count)),
+          ),
+        ),
+      ),
+    ),
+  );
+}
+
+function spendCard(ctx, trips) {
+  const spend = spendSummary(trips);
+  if (!spend.hasPrices) {
+    return h(
+      'section',
+      { class: 'card' },
+      h('div', { class: 'card__head' }, h('h3', {}, 'Spending')),
+      h(
+        'div',
+        { class: 'card__body' },
+        h(
+          'p',
+          { class: 'dept-note' },
+          'No prices recorded yet. Importing a receipt captures what each item cost, which is what fills this in.',
+        ),
+        h('button', { class: 'btn btn--sm btn--primary', onClick: () => openImporter(ctx) }, 'Import a receipt'),
+      ),
+    );
+  }
+
+  const maxStore = Math.max(...spend.byStore.map(([, c]) => c), 1);
+  const maxDept = Math.max(...spend.byDept.map(([, c]) => c), 1);
+
+  return h(
+    'section',
+    { class: 'card card--accent' },
+    h(
+      'div',
+      { class: 'card__head' },
+      h('h3', {}, 'Spending'),
+      h('span', { class: 'spacer' }),
+      h(
+        'span',
+        { class: 'dept-note' },
+        spend.pricedTrips === spend.totalTrips
+          ? `all ${pluralize(spend.totalTrips, 'trip')}`
+          : `${spend.pricedTrips} of ${spend.totalTrips} trips have prices`,
+      ),
+    ),
+    h(
+      'div',
+      { class: 'stat-grid', style: { margin: 0, border: 0, borderRadius: 0 } },
+      stat(formatMoney(spend.totalCents), spend.fromPrintedTotals ? 'Total paid' : 'Total recorded'),
+      stat(formatMoney(spend.avgTripCents), 'Average trip'),
+      stat(String(spend.byStore.length), spend.byStore.length === 1 ? 'Store' : 'Stores'),
+    ),
+    h(
+      'div',
+      { class: 'card__body' },
+      spend.byStore.length > 1
+        ? h(
+            'div',
+            { style: { marginBottom: '1.25rem' } },
+            h('p', { class: 'eyebrow' }, 'By store'),
+            h(
+              'ul',
+              { class: 'bars' },
+              spend.byStore.map(([name, cents]) =>
+                h(
+                  'li',
+                  { class: 'bar' },
+                  h('span', { class: 'bar__label' }, name),
+                  h(
+                    'span',
+                    { class: 'bar__track' },
+                    h('span', { class: 'bar__fill', style: { width: `${(cents / maxStore) * 100}%` } }),
+                  ),
+                  h('span', { class: 'bar__value' }, formatMoney(cents)),
+                ),
+              ),
+            ),
+          )
+        : null,
+      h('p', { class: 'eyebrow' }, 'By department'),
+      h(
+        'p',
+        { class: 'dept-note', style: { marginTop: '-0.2rem' } },
+        `Shelf prices, before tax and savings — ${formatMoney(spend.lineCents)} in total.`,
+      ),
+      h(
+        'ul',
+        { class: 'bars' },
+        spend.byDept.slice(0, 10).map(([dept, cents]) =>
+          h(
+            'li',
+            { class: 'bar' },
+            h('span', { class: 'bar__label' }, departmentName(dept)),
+            h(
+              'span',
+              { class: 'bar__track' },
+              h('span', { class: 'bar__fill bar__fill--deal', style: { width: `${(cents / maxDept) * 100}%` } }),
+            ),
+            h('span', { class: 'bar__value' }, formatMoney(cents)),
           ),
         ),
       ),
@@ -398,7 +499,9 @@ function historyCard(ctx, trips) {
       { class: 'card__head' },
       h('h3', {}, 'Trip history'),
       h('span', { class: 'spacer' }),
+      h('button', { class: 'btn btn--sm btn--primary', onClick: () => openImporter(ctx) }, 'Import a receipt'),
       h('button', { class: 'btn btn--sm btn--ghost', onClick: () => backfill(ctx) }, 'Log a past trip'),
+      h('button', { class: 'btn btn--sm btn--ghost', onClick: () => aliasManager(ctx) }, 'Learned names'),
     ),
     h(
       'ul',
@@ -410,7 +513,14 @@ function historyCard(ctx, trips) {
           h(
             'div',
             { class: 'row__main' },
-            h('div', { class: 'row__name' }, formatLongDate(trip.date)),
+            h(
+              'div',
+              { class: 'row__name' },
+              formatLongDate(trip.date),
+              trip.totalCents != null &&
+                h('span', { class: 'badge badge--plain' }, formatMoney(trip.totalCents)),
+              ...(trip.stores ?? []).map((s) => h('span', { class: 'badge badge--person' }, s)),
+            ),
             h(
               'div',
               { class: 'row__meta' },

@@ -15,6 +15,8 @@ const SHELL = [
   'assets/js/util.js',
   'assets/js/insights.js',
   'assets/js/deals-data.js',
+  'assets/js/receipts.js',
+  'assets/js/ocr.js',
   'assets/js/crypto.js',
   'assets/js/sync.js',
   'assets/js/data/catalog.js',
@@ -25,6 +27,7 @@ const SHELL = [
   'assets/js/views/trends.js',
   'assets/js/views/settings.js',
   'assets/js/views/sharing.js',
+  'assets/js/views/receipts.js',
 ];
 
 self.addEventListener('install', (event) => {

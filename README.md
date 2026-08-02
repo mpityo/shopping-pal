@@ -15,6 +15,8 @@ It answers the things Notes could not:
   the things you actually buy.
 - **One list for everyone.** An encrypted file in this repo, opened by an
   invite link — every phone in the house sees the same list.
+- **Receipt import.** Paste or photograph a receipt to record a trip, with
+  prices, so the trends have real history and real spend behind them.
 
 ## Using it
 
@@ -25,6 +27,30 @@ It answers the things Notes could not:
 | **BOGOs** | The Publix ad, with your regulars called out. |
 | **Trends** | Everything computed from finished trips. |
 | **Setup** | Who's in the household, the shared list, the store route, and export/import of your data. |
+
+## Importing receipts
+
+**Trends → Import a receipt.** Paste the text of a Publix or Walmart receipt
+(both email them, both show them in-app), or photograph a paper one — photos
+are read on your device and never uploaded.
+
+Every line is reviewed before anything is recorded. That is deliberate: trips
+are the only source for every trend, so one mis-parsed line quietly corrupts
+the numbers the app exists to produce. The review screen shows what was matched
+confidently, what it is unsure about, and what needs picking.
+
+**Corrections are remembered.** `GV SHRD MOZZ` is never going to fuzzy-match
+shredded cheese, so fix it once and every future receipt maps it automatically.
+Setup lists what has been learned, in case something needs unlearning.
+
+**Two stores, one trip.** Importing a second receipt with the same date merges
+into that trip rather than creating another, so a Publix run and a Walmart run
+count as one outing — with each line tagged by store and spend split between
+them.
+
+Before importing, the app checks its own arithmetic: items, minus savings, plus
+tax should equal the printed total. If it doesn't, it says so, because that
+usually means a line was misread.
 
 **Finishing a trip is what makes the trends work.** Checked items are recorded
 as bought and cleared; unchecked items stay on the list. Nothing you did not
@@ -188,6 +214,8 @@ assets/js/app.js               router + shell rendering
 assets/js/store.js             state, persistence, actions
 assets/js/insights.js          cadence and trend maths
 assets/js/deals-data.js        BOGO feed loading + catalog matching
+assets/js/receipts.js          receipt parsing, matching, reconciliation
+assets/js/ocr.js               optional photo OCR, loaded only when used
 assets/js/crypto.js            key generation + encryption for the shared list
 assets/js/sync.js              reading/writing the shared file on GitHub
 assets/js/data/catalog.js      the seed list from Notes
