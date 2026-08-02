@@ -1,59 +1,59 @@
 {
   "status": "ok",
-  "updated": "2026-08-01T20:26:55.276Z",
+  "updated": "2026-08-02T00:55:42.855Z",
   "store": "Publix store #111",
   "storeNumber": "111",
   "validThrough": "2026-08-04",
-  "source": "https://services.publix.com/api/v4/savings?promotionType=BOGO&pageSize=200&page=1&storeNumber=111",
+  "source": "https://services.publix.com/api/v4/savings?promotionType=BOGO&pageSize=500&page=1&storeNumber=111",
   "count": 7,
   "deals": [
     {
       "id": "67825b55-e140-46ad-9e47-49b3e6d18fd6",
       "title": "Buy any ONE (1) Coca-Cola 20oz Soft Drinks and Get ONE (1) Dasani 20oz or smartwater 20oz FREE",
       "brand": "Coca Cola, Dasani, Smartwater",
-      "category": null,
+      "category": "Digital coupon",
       "savings": "Free with purchase"
     },
     {
       "id": "4458e516-8340-4cd1-a75d-c6083e1b7dce",
       "title": "Buy any ONE (1) Core Power 26g/42g 14oz, Get any ONE (1) BODYARMOR Flash IV 20oz FREE",
       "brand": "BODYARMOR",
-      "category": null,
+      "category": "Digital coupon",
       "savings": "Free with purchase"
     },
     {
       "id": "ecd7973f-287a-44b9-aec0-dc43467b3a29",
       "title": "Buy any ONE (1) King’s Hawaiian® Pretzel Bites and Get ONE (1) Publix Jalapeño Popper Dip for FREE",
       "brand": "King's Hawaiian",
-      "category": null,
+      "category": "Digital coupon",
       "savings": "Free with purchase"
     },
     {
       "id": "5ddcf729-1807-4454-a704-90f367fe640a",
       "title": "Buy any ONE (1) MOUNTAIN DEW 20-oz and Get ONE (1) TROLLI 7.2-oz or less bag FREE",
       "brand": "Mountain Dew, Trolli",
-      "category": null,
+      "category": "Digital coupon",
       "savings": "Free with purchase"
     },
     {
       "id": "e6bf6680-5b62-4132-9a3d-c4bd7fb143b3",
       "title": "Buy ONE (1) PEPSI 10pk 7.5 oz and Get ONE (1) DORITOS, CHEETOS, SUN CHIPS or FUNYUNS 2.88-5.125-oz FREE",
       "brand": "PEPSI-COLA, DORITOS, CHEETOS, SUN CHIPS or FUNYUNS",
-      "category": null,
+      "category": "Digital coupon",
       "savings": "Free with purchase"
     },
     {
       "id": "8c22f50d-3bad-4981-b560-7a5afa90f423",
       "title": "Buy ONE (1) PEPSI 20-oz and Get ONE (1) LAY'S Single Bag 1.875-3.625-oz Free",
       "brand": "PEPSI-COLA, LAY'S",
-      "category": null,
+      "category": "Digital coupon",
       "savings": "Free with purchase"
     },
     {
       "id": "742c77d6-4b44-44f6-8733-a9fb70ac1a0d",
       "title": "Buy ONE (1) STARBUCKS Coffee & Protein 12 oz and Get ONE (1) QUACKER Instant Oatmeal Cup Free",
       "brand": "STARBUCKS, QUAKER OATMEAL",
-      "category": null,
+      "category": "Digital coupon",
       "savings": "Free with purchase"
     }
   ]
