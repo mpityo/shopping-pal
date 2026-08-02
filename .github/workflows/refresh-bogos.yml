@@ -16,6 +16,10 @@ on:
         required: false
         default: false
         type: boolean
+      postal:
+        description: 'ZIP code (discovery only) — lets the probe reach third-party circular platforms'
+        required: false
+        type: string
 
 # Pages needs write + id-token, on top of contents:write for the feed commit.
 permissions:
@@ -48,6 +52,7 @@ jobs:
         if: ${{ inputs.discover }}
         env:
           PUBLIX_STORE_NUMBER: ${{ inputs.store || vars.PUBLIX_STORE_NUMBER }}
+          PUBLIX_POSTAL_CODE: ${{ inputs.postal || vars.PUBLIX_POSTAL_CODE }}
         run: node scripts/fetch-publix-bogos.mjs --discover
 
       # The script never exits non-zero for an unreachable feed: it records the

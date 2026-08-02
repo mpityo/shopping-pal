@@ -24,6 +24,7 @@ import { dirname, resolve } from 'node:path';
 const args = parseArgs(process.argv.slice(2));
 const STORE = args.store ?? process.env.PUBLIX_STORE_NUMBER ?? '';
 const OUT = resolve(args.out ?? 'data/bogos.json');
+const POSTAL = args.postal ?? process.env.PUBLIX_POSTAL_CODE ?? '';
 const TIMEOUT_MS = 20_000;
 
 const UA =
@@ -59,6 +60,84 @@ function q(store, lead = '&') {
 }
 
 /**
+ * Pages to fetch as HTML rather than JSON.
+ *
+ * Round one proved services.publix.com/api/*\/savings is a digital-coupon
+ * service that ignores every filter parameter — 182 coupon rows, zero
+ * weekly-ad rows, identical for every combination tried. The weekly ad is not
+ * behind that host at all, so guessing more paths there is pointless.
+ *
+ * What is worth knowing instead: which platform renders the weekly ad page.
+ * Grocery circulars are usually served by a third party, and the page's own
+ * script and iframe hosts give that away in one fetch.
+ */
+const HTML_PROBES = [
+  ['weekly ad page', () => 'https://www.publix.com/savings/weekly-ad'],
+  ['weekly ad, BOGO tab', () => 'https://www.publix.com/savings/weekly-ad/bogo'],
+];
+
+/** Ad platforms that commonly back grocery circulars, keyed off a postal code. */
+const POSTAL_PROBES = [
+  [
+    'flipp item search',
+    (zip) => `https://backflipp.wishabi.com/flipp/items/search?locale=en-us&postal_code=${zip}&q=bogo`,
+  ],
+  [
+    'flipp merchants',
+    (zip) => `https://backflipp.wishabi.com/flipp/merchants?locale=en-us&postal_code=${zip}`,
+  ],
+];
+
+async function getText(url) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
+  try {
+    const res = await fetch(url, {
+      signal: controller.signal,
+      headers: { accept: 'text/html,application/xhtml+xml', 'user-agent': UA },
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status} ${res.statusText}`);
+    return await res.text();
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/**
+ * Report what a page is built from: embedded state blobs, and the external
+ * hosts it pulls scripts and frames from. That is what identifies the ad
+ * platform, which is the thing actually worth knowing.
+ */
+function describeHtml(html) {
+  const lines = [];
+  lines.push(`  ${html.length} bytes of HTML`);
+
+  for (const marker of ['__NEXT_DATA__', '__INITIAL_STATE__', '__NUXT__', 'application/ld+json']) {
+    const at = html.indexOf(marker);
+    if (at >= 0) lines.push(`  contains ${marker} at offset ${at}`);
+  }
+
+  const hosts = new Map();
+  for (const m of html.matchAll(/(?:src|href)="https?:\/\/([^/"]+)/gi)) {
+    const host = m[1].toLowerCase();
+    if (host.endsWith('publix.com')) continue;
+    hosts.set(host, (hosts.get(host) ?? 0) + 1);
+  }
+  const external = [...hosts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 12);
+  if (external.length) {
+    lines.push(`  external hosts: ${external.map(([h, n]) => `${h}×${n}`).join(', ')}`);
+  }
+
+  const interesting = new Set();
+  for (const m of html.matchAll(/https?:\/\/[^"'\s<>]*(?:weekly|circular|flipp|wishabi|savings|promo)[^"'\s<>]*/gi)) {
+    if (m[0].length < 200) interesting.add(m[0]);
+  }
+  for (const url of [...interesting].slice(0, 10)) lines.push(`  url: ${url}`);
+
+  return lines;
+}
+
+/**
  * Try every probe and report what came back, without writing the feed.
  * Read the Action log, pick the endpoint that carries the weekly ad, and move
  * it into CANDIDATES.
@@ -79,7 +158,37 @@ async function discover() {
       log(`\n${name}\n  ${url}\n  → ${err.message}`);
     }
   }
-  log('\nDiscovery complete. Move the endpoint carrying the weekly ad into CANDIDATES.');
+  for (const [name, build] of HTML_PROBES) {
+    const url = build();
+    log(`\n${name}\n  ${url}`);
+    try {
+      const html = await getText(url);
+      for (const line of describeHtml(html)) log(line);
+    } catch (err) {
+      log(`  → ${err.message}`);
+    }
+  }
+
+  if (POSTAL) {
+    for (const [name, build] of POSTAL_PROBES) {
+      const url = build(encodeURIComponent(POSTAL));
+      log(`\n${name}\n  ${url}`);
+      try {
+        const json = await getJson(url);
+        const { deals, report } = normalise(json);
+        describe(name, report);
+        log(`  would yield ${deals.length} BOGO deal(s)`);
+        for (const d of deals.slice(0, 5)) log(`  sample: ${d.title.slice(0, 88)}`);
+      } catch (err) {
+        log(`  → ${err.message}`);
+      }
+    }
+  } else {
+    log('\nNo postal code set, so the third-party circular platforms were not probed.');
+    log('Set PUBLIX_POSTAL_CODE (or pass it to the workflow) to include them.');
+  }
+
+  log('\nDiscovery complete.');
 }
 
 /** Tried in order; the first one that yields deals wins. */
@@ -87,20 +196,8 @@ const CANDIDATES = [
   {
     name: 'services v4 savings',
     url: (store) =>
-      `https://services.publix.com/api/v4/savings?promotionType=BOGO&pageSize=200&page=1` +
+      `https://services.publix.com/api/v4/savings?promotionType=BOGO&pageSize=500&page=1` +
       (store ? `&storeNumber=${encodeURIComponent(store)}` : ''),
-  },
-  {
-    name: 'services v1 savings',
-    url: (store) =>
-      `https://services.publix.com/api/v1/savings?promotionTypes=BOGO&pageSize=200` +
-      (store ? `&storeNumber=${encodeURIComponent(store)}` : ''),
-  },
-  {
-    name: 'weeklyad sitecore',
-    url: (store) =>
-      `https://services.publix.com/api/v1/weeklyad/bogo` +
-      (store ? `?storeNumber=${encodeURIComponent(store)}` : ''),
   },
 ];
 
