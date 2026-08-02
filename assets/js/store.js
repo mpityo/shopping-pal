@@ -301,13 +301,15 @@ export function importReceipt({ date, store, lines, totalCents = null, fingerpri
   }
 
   for (const line of bought) {
-    // Same item twice from the same store on one trip is one line, not two.
-    const existing = trip.items.find((i) => i.id === line.id && i.store === line.store);
-    if (existing) {
-      existing.qty += line.qty;
-      if (line.priceCents != null) {
-        existing.priceCents = (existing.priceCents ?? 0) + line.priceCents;
-      }
+    // An item checked off the list carries no price. The receipt is telling us
+    // what that same purchase cost, so fill it in rather than recording the
+    // thing twice — this is the shop-with-the-list-then-share-the-receipt path.
+    const unpriced = trip.items.find((i) => i.id === line.id && i.priceCents == null);
+    if (unpriced) {
+      unpriced.priceCents = line.priceCents;
+      unpriced.store = line.store;
+      // The receipt is the authoritative record of how many were bought.
+      unpriced.qty = line.qty;
     } else {
       trip.items.push(line);
     }

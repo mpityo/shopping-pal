@@ -58,10 +58,17 @@ into that trip rather than creating another, so a Publix run and a Walmart run
 count as one outing — with each line tagged by store and spend split between
 them.
 
+**Shop with the list, then share the receipt.** This is the normal way round,
+and it is handled properly: items you checked off already count as bought, so a
+receipt line matching one of them fills in what it cost rather than recording
+the purchase twice. Lines the receipt has and the list did not are added.
+Things you checked off that are not on this receipt are named and left alone —
+usually the other shop's half of the trip.
+
 **Nothing gets double-counted.** Sharing the same receipt twice is easy to do
 from a phone, so each one is fingerprinted: re-importing says so plainly. Lines
-matching what is already recorded for that date are flagged and unticked, and
-you can tick one back on if you really did buy two.
+already recorded *with a price* are flagged and unticked, and you can tick one
+back on if you really did buy two.
 
 Before importing, the app checks its own arithmetic: items, minus savings, plus
 tax should equal the printed total. If it doesn't, it says so, because that

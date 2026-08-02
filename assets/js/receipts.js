@@ -274,28 +274,64 @@ function hash(text) {
 }
 
 /**
- * Flag lines that already appear in the trip being appended to.
+ * Work out what each receipt line means for a trip that already exists.
  *
- * Same item, same store, same price is treated as the same purchase rather
- * than a second one — the common case is re-importing a receipt, not buying
- * two identical things at identical prices and having them ring up separately.
+ * The common workflow is: shop with the list, tap Finish trip, then share the
+ * receipt. Those checked-off lines carry no price and no store, so a naive
+ * key comparison sees them as different things and the receipt lands a second
+ * copy of everything. Three outcomes instead:
+ *
+ *   enrich    — the trip already has this item with no price. The receipt is
+ *               filling in what it cost, not adding a purchase.
+ *   duplicate — an identical priced line is already there, so this is a
+ *               re-import rather than a second purchase.
+ *   new       — not on the trip. Bought but never listed, or from the other
+ *               store on a two-shop outing.
+ *
+ * Each existing line is consumed at most once, so two eggs on the receipt
+ * against one checked-off egg gives one enrich and one new.
  */
-export function markDuplicates(rows, existingLines) {
-  const seen = new Map();
+export function classifyAgainstTrip(rows, existingLines) {
+  const pool = new Map();
   for (const line of existingLines ?? []) {
-    const key = `${line.id}:${line.store ?? ''}:${line.priceCents ?? ''}`;
-    seen.set(key, (seen.get(key) ?? 0) + 1);
+    if (!pool.has(line.id)) pool.set(line.id, []);
+    pool.get(line.id).push({ line, used: false });
   }
-  return rows.map((row) => {
-    if (!row.itemId) return { ...row, duplicate: false };
-    const key = `${row.itemId}:${row.store ?? ''}:${row.line.priceCents}`;
-    const remaining = seen.get(key) ?? 0;
-    if (remaining > 0) {
-      seen.set(key, remaining - 1);
-      return { ...row, duplicate: true };
+
+  const classified = rows.map((row) => {
+    if (!row.itemId) return { ...row, status: 'new' };
+    const candidates = pool.get(row.itemId) ?? [];
+
+    const unpriced = candidates.find((c) => !c.used && c.line.priceCents == null);
+    if (unpriced) {
+      unpriced.used = true;
+      return { ...row, status: 'enrich' };
     }
-    return { ...row, duplicate: false };
+
+    const identical = candidates.find(
+      (c) =>
+        !c.used &&
+        c.line.priceCents === row.line.priceCents &&
+        (c.line.store ?? null) === (row.store ?? null),
+    );
+    if (identical) {
+      identical.used = true;
+      return { ...row, status: 'duplicate' };
+    }
+
+    return { ...row, status: 'new' };
   });
+
+  // What was checked off but is not on this receipt — usually the other
+  // store's half of the trip, which is worth saying rather than hiding.
+  const uncovered = [];
+  for (const entries of pool.values()) {
+    for (const entry of entries) {
+      if (!entry.used && entry.line.priceCents == null) uncovered.push(entry.line);
+    }
+  }
+
+  return { rows: classified, uncovered };
 }
 
 export function sumCents(lines) {

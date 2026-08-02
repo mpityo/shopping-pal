@@ -18,7 +18,7 @@ import {
   formatMoney,
   aliasKey,
   receiptFingerprint,
-  markDuplicates,
+  classifyAgainstTrip,
 } from '../receipts.js';
 import * as ocr from '../ocr.js';
 import * as pdf from '../pdf.js';
@@ -178,7 +178,7 @@ function openReview(ctx, parsed) {
     ...m,
     include: true,
     qty: m.line.qty,
-    duplicate: false,
+    status: 'new',
     // Remember whether the mapping was chosen by hand, so only real decisions
     // are learned as aliases.
     taught: false,
@@ -197,52 +197,92 @@ function openReview(ctx, parsed) {
    */
   function refreshDuplicates() {
     const existing = store.tripLinesOn(dateInput.value);
-    const flagged = markDuplicates(
+    const { rows: flagged, uncovered } = classifyAgainstTrip(
       rows.map((r) => ({ ...r, store: storeSelect.value })),
       existing,
     );
-    let dupes = 0;
+
+    const counts = { enrich: 0, duplicate: 0, new: 0 };
     flagged.forEach((f, i) => {
       const row = rows[i];
-      const wasDuplicate = row.duplicate;
-      row.duplicate = f.duplicate;
-      if (f.duplicate) dupes++;
-      // Only auto-toggle when the flag actually changed, so a deliberate
-      // override is not undone on the next refresh.
-      if (f.duplicate !== wasDuplicate) {
-        row.include = !f.duplicate;
+      const changed = row.status !== f.status;
+      row.status = f.status;
+      counts[f.status]++;
+      // Only auto-toggle when the classification actually changed, so a
+      // deliberate override survives the next refresh.
+      if (changed) {
+        row.include = f.status !== 'duplicate';
         const box = tableBody.children[i]?.querySelector('input[type="checkbox"]');
         if (box) box.checked = row.include;
         if (tableBody.children[i]) {
           tableBody.children[i].style.opacity = row.include ? '1' : '0.45';
         }
       }
+      if (tableBody.children[i]) {
+        tableBody.children[i].style.background =
+          f.status === 'duplicate'
+            ? 'var(--alert-tint)'
+            : row.confidence !== 'high' && row.confidence !== 'alias'
+              ? 'var(--deal-tint)'
+              : '';
+      }
       const note = tableBody.children[i]?.querySelector('[data-note]');
       if (note) note.textContent = noteFor(row);
     });
 
-    dupNotice.replaceChildren(
-      dupes
-        ? h(
-            'div',
-            { class: 'notice notice--warn' },
-            h('strong', {}, `${pluralize(dupes, 'line')} already recorded on this date`),
-            'They are unticked below. Tick one only if you genuinely bought it twice.',
-          )
-        : existing.length
-          ? h(
-              'div',
-              { class: 'notice' },
-              h('strong', {}, `Adding to an existing trip`),
-              `${pluralize(existing.length, 'item')} already recorded on this date — these will be added alongside.`,
-            )
-          : '',
-    );
+    const messages = [];
+    if (counts.enrich) {
+      messages.push(
+        h(
+          'div',
+          { class: 'notice' },
+          h(
+            'strong',
+            {},
+            `${pluralize(counts.enrich, 'line')} ${counts.enrich === 1 ? 'matches' : 'match'} what you checked off`,
+          ),
+          'Those already count as bought — the receipt is filling in what they cost, not adding them again.',
+        ),
+      );
+    }
+    if (counts.duplicate) {
+      messages.push(
+        h(
+          'div',
+          { class: 'notice notice--warn' },
+          h(
+            'strong',
+            {},
+            `${pluralize(counts.duplicate, 'line')} already recorded with a price`,
+          ),
+          'Unticked below. Tick one only if you genuinely bought it twice.',
+        ),
+      );
+    }
+    if (uncovered.length) {
+      messages.push(
+        h(
+          'div',
+          { class: 'notice' },
+          h(
+            'strong',
+            {},
+            `${pluralize(uncovered.length, 'checked-off item')} not on this receipt`,
+          ),
+          `${uncovered
+            .slice(0, 8)
+            .map((l) => l.name)
+            .join(', ')}${uncovered.length > 8 ? '…' : ''} — left as they are. If it was a two-shop trip, share the other receipt too.`,
+        ),
+      );
+    }
+    dupNotice.replaceChildren(...messages);
     refreshSummary();
   }
 
   function noteFor(row) {
-    if (row.duplicate) return 'already on this trip';
+    if (row.status === 'duplicate') return 'already recorded with a price';
+    if (row.status === 'enrich') return 'you checked this off — adding the price';
     if (row.confidence === 'alias') return 'learned previously';
     if (row.confidence === 'high') return 'matched';
     if (row.confidence === 'low') return 'unsure — please check';
@@ -253,11 +293,15 @@ function openReview(ctx, parsed) {
     const kept = rows.filter((r) => r.include && r.itemId);
     const cents = kept.reduce((sum, r) => sum + r.line.priceCents, 0);
     const unmatched = rows.filter((r) => r.include && !r.itemId).length;
+    const adding = kept.filter((r) => r.status === 'new').length;
+    const pricing = kept.filter((r) => r.status === 'enrich').length;
     summary.replaceChildren(
       h(
         'span',
-        {},
+        { dataset: { summary: '1' } },
         `${pluralize(kept.length, 'line')} ready · ${formatMoney(cents)}`,
+        pricing ? ` · ${pricing} pricing what you checked off` : '',
+        adding ? ` · ${adding} new to the trip` : '',
         unmatched ? ` · ${unmatched} still need an item` : '',
       ),
     );
@@ -327,6 +371,7 @@ function openReview(ctx, parsed) {
     if (row.confidence !== 'high' && row.confidence !== 'alias') {
       tr.style.background = 'var(--deal-tint)';
     }
+    tr.dataset.line = String(row.line.priceCents);
     tableBody.append(tr);
   }
   refreshSummary();
