@@ -3,7 +3,7 @@
  * cached up front and served cache-first; the BOGO feed is network-first so a
  * fresh ad wins when there is signal, with the cached copy as the fallback.
  */
-const VERSION = 'shopping-pal-v3';
+const VERSION = 'shopping-pal-v4';
 /** Where a shared receipt is parked between the POST and the page load. */
 const SHARE_CACHE = 'shopping-pal-shared';
 const SHELL = [
@@ -33,6 +33,7 @@ const SHELL = [
   'assets/js/views/sharing.js',
   'assets/js/views/receipts.js',
   'assets/js/views/ai-hints.js',
+  'assets/js/views/item-picker.js',
 ];
 
 self.addEventListener('install', (event) => {

@@ -18,6 +18,28 @@ import { normalize, matchScore } from './util.js';
 const NOT_AN_ITEM =
   /^(?:order|grand|store|purchase|net)?\s*(sub\s*total|total\b|balance|tax\b|sales\s+tax|change\b|tender|cash\b|debit|credit|visa|mastercard|amex|discover|ebt|savings|you\s+saved|total\s+savings|coupon|items?\s+sold|# ?items|ref\s*#|st\s*#|op\s*#|te\s*#|tr\s*#|aid\b|approval|auth\b|account|card\b|thank\s+you|survey|manager|store\s+\d|www\.|tel\b|phone|receipt|order\s+#|terminal)/i;
 
+/**
+ * Payment furniture, matched anywhere in the line rather than only at the
+ * start.
+ *
+ * The list above is anchored, which is right for "Total" but wrong for how
+ * tender lines actually print: "CHASE VISA ****1234  42.60" and "EFT DEBIT
+ * PURCHASE  42.60" both lead with something else, sail past an anchored
+ * check, and land in the basket as items — at the full value of the receipt,
+ * which quietly doubles the trip.
+ *
+ * Every word here is chosen to be one that does not appear in a grocery
+ * aisle, and word boundaries keep the near-misses out: `\bcash\b` does not
+ * match cashews, `\bcard\b` does not match cardamom. The genuine casualty is
+ * a greeting card, which is rare, visible in the review table, and cheaper to
+ * re-add by hand than a phantom item on every single receipt.
+ */
+const PAYMENT_LINE =
+  /\b(?:visa|mastercard|master\s*card|amex|american\s+express|discover\b|debit|credit|eft|eftpos|eps\b|interac|chip\s+read|swiped?|contactless|tap\b|tender(?:ed)?|auth(?:oriz\w*)?|approval|acct|account|aid[:#]|arqc|tvr\b|iad\b|trace|terminal|merchant\s*id|cardholder|change\s+due|cash\s+back|amount\s+due|balance\s+due|payment|paid\b|signature|pin\s+verified|entry\s+method)\b/i;
+
+/** A masked card number, in any of the shapes receipts print them. */
+const MASKED_PAN = /(?:[*x•#]\s?){4,}\d{2,4}|\b[xX*]{4,}\d{4}\b/;
+
 /** A trailing money amount, optionally negative or flagged. */
 const TRAILING_MONEY = /(-?)\$?\s*(\d{1,4}\.\d{2})\s*[A-Z]?\s*$/;
 
@@ -132,7 +154,8 @@ export function parseReceipt(text) {
       continue;
     }
 
-    if (NOT_AN_ITEM.test(line.trim())) {
+    const trimmed = line.trim();
+    if (NOT_AN_ITEM.test(trimmed) || PAYMENT_LINE.test(trimmed) || MASKED_PAN.test(trimmed)) {
       skipped++;
       continue;
     }

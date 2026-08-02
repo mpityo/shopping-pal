@@ -7,6 +7,7 @@
  */
 import { CATALOG, DEFAULT_PEOPLE } from './data/catalog.js';
 import { DEPARTMENTS } from './data/departments.js';
+import { normalize } from './util.js';
 
 const KEY = 'shopping-pal.v1';
 const listeners = new Set();
@@ -35,6 +36,16 @@ const defaultState = () => ({
   aliases: {},
   /** fingerprint -> { date, store, at }, so the same receipt is not imported twice */
   importedReceipts: {},
+  /**
+   * Receipt lines left out of an import because nothing in the catalog was
+   * them. Keyed by normalized wording -> { name, seen: [{ date, store,
+   * priceCents, qty }] }. Kept because buying something three times in a month
+   * that the catalog has never heard of is exactly the signal worth surfacing,
+   * and the purchases can be backfilled once it is adopted.
+   */
+  unmatched: {},
+  /** Keys explicitly dismissed, so "no thanks" is not asked again. */
+  unmatchedIgnored: [],
   /** household members, named in the app rather than in code */
   people: DEFAULT_PEOPLE.map((p) => ({ ...p })),
   peopleUpdatedAt: 0,
@@ -341,6 +352,108 @@ export function importReceipt({ date, store, lines, totalCents = null, fingerpri
   return trip;
 }
 
+// ── Bought, but not in the catalog ───────────────────────────────────────
+
+/**
+ * Remember a receipt line that was left out because nothing matched it.
+ *
+ * Dropping these silently is how "we've started buying Gatorade Zero" stays
+ * invisible: the purchase never reaches a trip, so no trend can ever notice
+ * it. Recording the sighting costs nothing and makes the pattern visible after
+ * the second or third receipt.
+ */
+export function noteUnmatched(entries) {
+  let changed = 0;
+  for (const entry of entries) {
+    const key = normalize(entry.name);
+    if (!key || state.unmatchedIgnored.includes(key)) continue;
+    const record = state.unmatched[key] ?? { name: entry.name, seen: [] };
+    // One sighting per receipt date and store, so re-importing the same
+    // receipt cannot inflate the count into a false pattern.
+    const already = record.seen.some(
+      (s) => s.date === entry.date && (s.store ?? null) === (entry.store ?? null),
+    );
+    if (already) continue;
+    record.name = entry.name;
+    record.seen.push({
+      date: entry.date,
+      store: entry.store ?? null,
+      priceCents: entry.priceCents ?? null,
+      qty: entry.qty ?? 1,
+    });
+    record.seen.sort((a, b) => a.date.localeCompare(b.date));
+    state.unmatched[key] = record;
+    changed++;
+  }
+  if (changed) emit();
+  return changed;
+}
+
+/** What has been bought more than once without ever being in the catalog. */
+export function unmatchedRepeats(minTimes = 2) {
+  return Object.entries(state.unmatched)
+    .map(([key, record]) => ({
+      key,
+      name: record.name,
+      count: record.seen.length,
+      first: record.seen[0]?.date,
+      last: record.seen[record.seen.length - 1]?.date,
+      seen: record.seen,
+    }))
+    .filter((r) => r.count >= minTimes)
+    .sort((a, b) => b.count - a.count || b.last.localeCompare(a.last));
+}
+
+export function ignoreUnmatched(key) {
+  delete state.unmatched[key];
+  if (!state.unmatchedIgnored.includes(key)) state.unmatchedIgnored.push(key);
+  emit();
+}
+
+/**
+ * Take an uncatalogued purchase into the catalog, and give it its history.
+ *
+ * Adding the item alone would only fix the future. The past sightings are
+ * already known — date, store, price — and the trips they belong to already
+ * exist, so backfilling them is what makes "bought three times this month"
+ * true in the trends rather than merely remembered here. Without this, a newly
+ * adopted item looks brand new and its cadence starts from nothing.
+ */
+export function adoptUnmatched(key, itemId) {
+  const record = state.unmatched[key];
+  const item = items().find((i) => i.id === itemId);
+  if (!record || !item) return 0;
+
+  let backfilled = 0;
+  for (const sighting of record.seen) {
+    const trip = state.trips.find((t) => t.date === sighting.date);
+    if (!trip) continue;
+    // The trip may already have it if the user matched a later receipt by
+    // hand before adopting this one.
+    const duplicate = trip.items.some(
+      (i) =>
+        i.id === itemId &&
+        i.priceCents === sighting.priceCents &&
+        (i.store ?? null) === (sighting.store ?? null),
+    );
+    if (duplicate) continue;
+    trip.items.push({
+      id: item.id,
+      name: item.name,
+      qty: sighting.qty ?? 1,
+      dept: item.dept,
+      priceCents: sighting.priceCents ?? null,
+      store: sighting.store ?? null,
+    });
+    backfilled++;
+  }
+
+  state.aliases[key] = itemId;
+  delete state.unmatched[key];
+  emit();
+  return backfilled;
+}
+
 /** Remember what a receipt's wording maps to, so the next one is automatic. */
 export function learnAliases(map) {
   let learned = 0;
@@ -558,6 +671,8 @@ const SHARED_FIELDS = [
   'manualDeals',
   'aliases',
   'importedReceipts',
+  'unmatched',
+  'unmatchedIgnored',
   'people',
   'peopleUpdatedAt',
 ];
@@ -619,6 +734,33 @@ export function mergeShared(remote) {
 
   const remotePeopleNewer = (remote.peopleUpdatedAt ?? 0) > (state.peopleUpdatedAt ?? 0);
 
+  // Uncatalogued sightings are per-purchase facts, so both phones' lists are
+  // kept and the sightings unioned by date and store — two people importing
+  // the two halves of one trip should add up, not overwrite each other. A
+  // dismissal on either phone wins, and adoption on either removes the entry.
+  const unmatchedIgnored = [
+    ...new Set([...(remote.unmatchedIgnored || []), ...state.unmatchedIgnored]),
+  ];
+  const adopted = new Set(Object.keys({ ...(remote.aliases || {}), ...state.aliases }));
+  const unmatched = {};
+  for (const key of new Set([
+    ...Object.keys(remote.unmatched || {}),
+    ...Object.keys(state.unmatched),
+  ])) {
+    if (unmatchedIgnored.includes(key) || adopted.has(key)) continue;
+    const merged = new Map();
+    for (const sighting of [
+      ...(remote.unmatched?.[key]?.seen ?? []),
+      ...(state.unmatched[key]?.seen ?? []),
+    ]) {
+      merged.set(`${sighting.date}|${sighting.store ?? ''}`, sighting);
+    }
+    unmatched[key] = {
+      name: state.unmatched[key]?.name ?? remote.unmatched[key].name,
+      seen: [...merged.values()].sort((a, b) => a.date.localeCompare(b.date)),
+    };
+  }
+
   state = {
     ...state,
     list,
@@ -628,6 +770,8 @@ export function mergeShared(remote) {
     customs: [...customsById.values()],
     aliases: { ...(remote.aliases || {}), ...state.aliases },
     importedReceipts: { ...(remote.importedReceipts || {}), ...state.importedReceipts },
+    unmatched,
+    unmatchedIgnored,
     manualDeals: [...dealsById.values()],
     archived: [...new Set([...(remote.archived || []), ...state.archived])],
     overrides: { ...(remote.overrides || {}), ...state.overrides },

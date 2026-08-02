@@ -58,6 +58,33 @@ Setup lists what has been learned, in case something needs unlearning. With a
 Claude key added, the abbreviations are read for you and you mostly stop doing
 this by hand — see [Claude](#claude).
 
+**Picking an item is a search, not a scroll.** Each row has a type-to-filter
+box, already showing the plausible answers ranked against what the receipt
+said, with the aisle alongside each one — which is what tells three kinds of
+carrot apart.
+
+**Not in the catalog is a normal answer.** Whole carrots when only shredded and
+baby are listed; something the house has just started buying. Add it from the
+row itself and the import carries on — the purchase is recorded, and every
+future receipt matches it.
+
+**Payment lines are not items.** `CHASE VISA ****1234  42.60` and `EFT DEBIT
+PURCHASE  42.60` lead with something other than the giveaway word, so an
+anchored check let them through as products priced at the whole receipt. They
+are now caught wherever they appear on the line. The words are chosen to be
+ones that do not appear in a grocery aisle, and word boundaries keep the
+near-misses out — `cash` does not match cashews, `card` does not match
+cardamom.
+
+**Things you have started buying get noticed.** A line left out because nothing
+matched it is remembered rather than discarded. Once one has turned up on two
+receipts, **Trends → Bought, but not in your catalog** says so and offers to
+adopt it. Doing that backfills the earlier purchases into the trips they came
+from, so it arrives with its cadence and price history intact instead of
+looking brand new. If it turns out to be wording for something you already
+have, point it at that item and the wording is learned instead. Dismissing one
+stops it being raised again.
+
 **Two stores, one trip.** Importing a second receipt with the same date merges
 into that trip rather than creating another, so a Publix run and a Walmart run
 count as one outing — with each line tagged by store and spend split between
@@ -319,6 +346,7 @@ assets/js/data/catalog.js      the seed list from Notes
 assets/js/data/departments.js  the store route
 assets/js/views/               one module per tab
 assets/js/views/ai-hints.js    view glue for Claude's suggestions
+assets/js/views/item-picker.js search-as-you-type catalog picker
 scripts/fetch-publix-bogos.mjs the Action's fetcher
 data/bogos.json                written by the Action, read by the page
 data/vault.json                the encrypted shared list (created from the app)
