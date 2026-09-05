@@ -1,6 +1,6 @@
 {
   "status": "ok",
-  "updated": "2026-09-04T14:51:59.199Z",
+  "updated": "2026-09-05T13:45:21.973Z",
   "store": "Publix store #111",
   "storeNumber": "111",
   "validThrough": "2026-09-08",
@@ -9,8 +9,176 @@
   "partialError": null,
   "deals": [
     {
-      "id": "1036568732",
-      "title": "Honeycrisp Apples",
+      "id": "1036612673",
+      "title": "Bagels Wonder",
+      "brand": null,
+      "category": "Weekly ad",
+      "savings": "BOGO"
+    },
+    {
+      "id": "1036647898",
+      "title": "Siete Tortillas",
+      "brand": null,
+      "category": "Weekly ad",
+      "savings": "BOGO"
+    },
+    {
+      "id": "1036648332",
+      "title": "Armour Pepperoni",
+      "brand": null,
+      "category": "Weekly ad",
+      "savings": "BOGO"
+    },
+    {
+      "id": "1036552529",
+      "title": "Reser's Salads",
+      "brand": null,
+      "category": "Weekly ad",
+      "savings": "BOGO"
+    },
+    {
+      "id": "1036532174",
+      "title": "Smithfield Bacon",
+      "brand": null,
+      "category": "Weekly ad",
+      "savings": "BOGO"
+    },
+    {
+      "id": "1036644858",
+      "title": "Sabra Hummus",
+      "brand": null,
+      "category": "Weekly ad",
+      "savings": "BOGO"
+    },
+    {
+      "id": "1036612227",
+      "title": "Lavazza Ground Coffee",
+      "brand": null,
+      "category": "Weekly ad",
+      "savings": "BOGO"
+    },
+    {
+      "id": "1036575260",
+      "title": "Florida's Natural Limeade",
+      "brand": null,
+      "category": "Weekly ad",
+      "savings": "BOGO"
+    },
+    {
+      "id": "1036647412",
+      "title": "Kraft Philadelphia Cream Cheese",
+      "brand": null,
+      "category": "Weekly ad",
+      "savings": "BOGO"
+    },
+    {
+      "id": "1036612214",
+      "title": "Pompeian Imported Olive Oil,",
+      "brand": null,
+      "category": "Weekly ad",
+      "savings": "BOGO"
+    },
+    {
+      "id": "1036576370",
+      "title": "Breyers Ice Cream",
+      "brand": null,
+      "category": "Weekly ad",
+      "savings": "BOGO"
+    },
+    {
+      "id": "1036647096",
+      "title": "Springer Mountain Farms Chicken Wings",
+      "brand": null,
+      "category": "Weekly ad",
+      "savings": "BOGO"
+    },
+    {
+      "id": "1036541174",
+      "title": "Kétchup de Tomate Heinz",
+      "brand": null,
+      "category": "Weekly ad",
+      "savings": "BOGO"
+    },
+    {
+      "id": "1036548781",
+      "title": "Häagen-Dazs Ice Cream",
+      "brand": null,
+      "category": "Weekly ad",
+      "savings": "BOGO"
+    },
+    {
+      "id": "1036648327",
+      "title": "6-Pack Coca-Cola Soft Drink Products",
+      "brand": null,
+      "category": "Weekly ad",
+      "savings": "BOGO"
+    },
+    {
+      "id": "1037736169",
+      "title": "4-Pack Fever-Tree Products",
+      "brand": null,
+      "category": "Weekly ad",
+      "savings": "BOGO"
+    },
+    {
+      "id": "1036548263",
+      "title": "Nature's Recipe Dog Food",
+      "brand": null,
+      "category": "Weekly ad",
+      "savings": "BOGO"
+    },
+    {
+      "id": "1036613952",
+      "title": "Café Colado en Frío Califia Farms",
+      "brand": null,
+      "category": "Weekly ad",
+      "savings": "BOGO"
+    },
+    {
+      "id": "1036612758",
+      "title": "Cóctel de Vodka Sinless Paquete de 8",
+      "brand": null,
+      "category": "Weekly ad",
+      "savings": "BOGO"
+    },
+    {
+      "id": "1036614267",
+      "title": "Refrescos Coca-Cola Paquete de 6",
+      "brand": null,
+      "category": "Weekly ad",
+      "savings": "BOGO"
+    },
+    {
+      "id": "1036645287",
+      "title": "College Inn Broth Or Stock",
+      "brand": null,
+      "category": "Weekly ad",
+      "savings": "BOGO"
+    },
+    {
+      "id": "1036646042",
+      "title": "Publix Red Seedless Watermelon Chunks",
+      "brand": null,
+      "category": "Weekly ad",
+      "savings": "BOGO"
+    },
+    {
+      "id": "1036644339",
+      "title": "Potato Inspirations Honey Gold Potatoes",
+      "brand": null,
+      "category": "Weekly ad",
+      "savings": "BOGO"
+    },
+    {
+      "id": "1036567489",
+      "title": "Pero Family Farms Snipped Green Beans",
+      "brand": null,
+      "category": "Weekly ad",
+      "savings": "BOGO"
+    },
+    {
+      "id": "1036612640",
+      "title": "Meriendas Tamaño para Fiesta Frito Lay",
       "brand": null,
       "category": "Weekly ad",
       "savings": "BOGO"
@@ -23,8 +191,8 @@
       "savings": "BOGO"
     },
     {
-      "id": "1036612673",
-      "title": "Bagels Wonder",
+      "id": "1036568732",
+      "title": "Honeycrisp Apples",
       "brand": null,
       "category": "Weekly ad",
       "savings": "BOGO"
@@ -44,8 +212,43 @@
       "savings": "BOGO"
     },
     {
-      "id": "1036647898",
-      "title": "Siete Tortillas",
+      "id": "1036534487",
+      "title": "Yogur Orgánico Stonyfield",
+      "brand": null,
+      "category": "Weekly ad",
+      "savings": "BOGO"
+    },
+    {
+      "id": "1036576322",
+      "title": "Stonyfield Organic Yogurt",
+      "brand": null,
+      "category": "Weekly ad",
+      "savings": "BOGO"
+    },
+    {
+      "id": "1036642732",
+      "title": "Publix Mussels",
+      "brand": null,
+      "category": "Weekly ad",
+      "savings": "BOGO"
+    },
+    {
+      "id": "1036612950",
+      "title": "Aperitivos de Camarones Margaritaville",
+      "brand": null,
+      "category": "Weekly ad",
+      "savings": "BOGO"
+    },
+    {
+      "id": "1036552544",
+      "title": "Beemster Cheese",
+      "brand": null,
+      "category": "Weekly ad",
+      "savings": "BOGO"
+    },
+    {
+      "id": "1036544052",
+      "title": "Queso Beemster",
       "brand": null,
       "category": "Weekly ad",
       "savings": "BOGO"
@@ -53,20 +256,6 @@
     {
       "id": "1036636373",
       "title": "Wonder Bagels",
-      "brand": null,
-      "category": "Weekly ad",
-      "savings": "BOGO"
-    },
-    {
-      "id": "1036612937",
-      "title": "Mejillones Publix",
-      "brand": null,
-      "category": "Weekly ad",
-      "savings": "BOGO"
-    },
-    {
-      "id": "1036613651",
-      "title": "Ponche Tampico",
       "brand": null,
       "category": "Weekly ad",
       "savings": "BOGO"
@@ -86,13 +275,6 @@
       "savings": "BOGO"
     },
     {
-      "id": "1036580830",
-      "title": "Carbone Sauce",
-      "brand": null,
-      "category": "Weekly ad",
-      "savings": "BOGO"
-    },
-    {
       "id": "1036614265",
       "title": "Barras Klondike",
       "brand": null,
@@ -100,8 +282,8 @@
       "savings": "BOGO"
     },
     {
-      "id": "1036552544",
-      "title": "Beemster Cheese",
+      "id": "1036580830",
+      "title": "Carbone Sauce",
       "brand": null,
       "category": "Weekly ad",
       "savings": "BOGO"
@@ -114,169 +296,8 @@
       "savings": "BOGO"
     },
     {
-      "id": "1036544052",
-      "title": "Queso Beemster",
-      "brand": null,
-      "category": "Weekly ad",
-      "savings": "BOGO"
-    },
-    {
-      "id": "1036648348",
-      "title": "Klondike Bars",
-      "brand": null,
-      "category": "Weekly ad",
-      "savings": "BOGO"
-    },
-    {
-      "id": "1036644858",
-      "title": "Sabra Hummus",
-      "brand": null,
-      "category": "Weekly ad",
-      "savings": "BOGO"
-    },
-    {
-      "id": "1036552529",
-      "title": "Reser's Salads",
-      "brand": null,
-      "category": "Weekly ad",
-      "savings": "BOGO"
-    },
-    {
-      "id": "1036614136",
-      "title": "Comida en Tazón",
-      "brand": null,
-      "category": "Weekly ad",
-      "savings": "BOGO"
-    },
-    {
-      "id": "1036645816",
-      "title": "Planters Peanuts",
-      "brand": null,
-      "category": "Weekly ad",
-      "savings": "BOGO"
-    },
-    {
-      "id": "1036648332",
-      "title": "Armour Pepperoni",
-      "brand": null,
-      "category": "Weekly ad",
-      "savings": "BOGO"
-    },
-    {
-      "id": "1036534506",
-      "title": "Helado Breyers",
-      "brand": null,
-      "category": "Weekly ad",
-      "savings": "BOGO"
-    },
-    {
-      "id": "1036613894",
-      "title": "Burritos El Monterey",
-      "brand": null,
-      "category": "Weekly ad",
-      "savings": "BOGO"
-    },
-    {
-      "id": "1036613316",
-      "title": "Ensaladas Reser's",
-      "brand": null,
-      "category": "Weekly ad",
-      "savings": "BOGO"
-    },
-    {
-      "id": "1036533372",
-      "title": "Tocino Smithfield",
-      "brand": null,
-      "category": "Weekly ad",
-      "savings": "BOGO"
-    },
-    {
-      "id": "1036614279",
-      "title": "Pepperoni Armour",
-      "brand": null,
-      "category": "Weekly ad",
-      "savings": "BOGO"
-    },
-    {
-      "id": "1036532174",
-      "title": "Smithfield Bacon",
-      "brand": null,
-      "category": "Weekly ad",
-      "savings": "BOGO"
-    },
-    {
-      "id": "1036642732",
-      "title": "Publix Mussels",
-      "brand": null,
-      "category": "Weekly ad",
-      "savings": "BOGO"
-    },
-    {
-      "id": "1036533024",
-      "title": "Pan Thomas' Swirl",
-      "brand": null,
-      "category": "Weekly ad",
-      "savings": "BOGO"
-    },
-    {
-      "id": "1036613687",
-      "title": "Pan Nature's Own Life",
-      "brand": null,
-      "category": "Weekly ad",
-      "savings": "BOGO"
-    },
-    {
-      "id": "1036645270",
-      "title": "Nature's Own Life Bread",
-      "brand": null,
-      "category": "Weekly ad",
-      "savings": "BOGO"
-    },
-    {
-      "id": "1036577388",
-      "title": "Thomas' Swirl Bread",
-      "brand": null,
-      "category": "Weekly ad",
-      "savings": "BOGO"
-    },
-    {
-      "id": "1036614270",
-      "title": "Palomitas de Maíz Lesserevil",
-      "brand": null,
-      "category": "Weekly ad",
-      "savings": "BOGO"
-    },
-    {
-      "id": "1036576322",
-      "title": "Stonyfield Organic Yogurt",
-      "brand": null,
-      "category": "Weekly ad",
-      "savings": "BOGO"
-    },
-    {
-      "id": "1036544044",
-      "title": "Dip de Hummus Sabra",
-      "brand": null,
-      "category": "Weekly ad",
-      "savings": "BOGO"
-    },
-    {
-      "id": "1036614191",
-      "title": "Agua Alcalina Publix",
-      "brand": null,
-      "category": "Weekly ad",
-      "savings": "BOGO"
-    },
-    {
-      "id": "1036612749",
-      "title": "Vino Chardonnay Made by James",
-      "brand": null,
-      "category": "Weekly ad",
-      "savings": "BOGO"
-    },
-    {
-      "id": "1036532986",
-      "title": "Bebida Deportiva Bodyarmor",
+      "id": "1036612937",
+      "title": "Mejillones Publix",
       "brand": null,
       "category": "Weekly ad",
       "savings": "BOGO"
@@ -289,36 +310,8 @@
       "savings": "BOGO"
     },
     {
-      "id": "1036646394",
-      "title": "Innovasian Cuisine Side Dish,",
-      "brand": null,
-      "category": "Weekly ad",
-      "savings": "BOGO"
-    },
-    {
-      "id": "1036644405",
-      "title": "Hot House Cucumbers",
-      "brand": null,
-      "category": "Weekly ad",
-      "savings": "BOGO"
-    },
-    {
-      "id": "1036612724",
-      "title": "Sirope Mrs. Butterworth's",
-      "brand": null,
-      "category": "Weekly ad",
-      "savings": "BOGO"
-    },
-    {
-      "id": "1036647450",
-      "title": "Banquet Mega Bowls",
-      "brand": null,
-      "category": "Weekly ad",
-      "savings": "BOGO"
-    },
-    {
-      "id": "1036645589",
-      "title": "Dot's Homestyle Pretzels",
+      "id": "1036646048",
+      "title": "Publix Tea or Lemonade",
       "brand": null,
       "category": "Weekly ad",
       "savings": "BOGO"
@@ -331,36 +324,50 @@
       "savings": "BOGO"
     },
     {
-      "id": "1036642068",
-      "title": "Margaritaville Shrimp Appetizers",
+      "id": "1036612724",
+      "title": "Sirope Mrs. Butterworth's",
       "brand": null,
       "category": "Weekly ad",
       "savings": "BOGO"
     },
     {
-      "id": "1036551241",
-      "title": "Edwards Pie Slices",
+      "id": "1036614279",
+      "title": "Pepperoni Armour",
       "brand": null,
       "category": "Weekly ad",
       "savings": "BOGO"
     },
     {
-      "id": "1036611837",
-      "title": "Birds Eye Vegetables",
+      "id": "1036533372",
+      "title": "Tocino Smithfield",
       "brand": null,
       "category": "Weekly ad",
       "savings": "BOGO"
     },
     {
-      "id": "1036612950",
-      "title": "Aperitivos de Camarones Margaritaville",
+      "id": "1036645816",
+      "title": "Planters Peanuts",
       "brand": null,
       "category": "Weekly ad",
       "savings": "BOGO"
     },
     {
-      "id": "1036576370",
-      "title": "Breyers Ice Cream",
+      "id": "1036613316",
+      "title": "Ensaladas Reser's",
+      "brand": null,
+      "category": "Weekly ad",
+      "savings": "BOGO"
+    },
+    {
+      "id": "1036614136",
+      "title": "Comida en Tazón",
+      "brand": null,
+      "category": "Weekly ad",
+      "savings": "BOGO"
+    },
+    {
+      "id": "1036613894",
+      "title": "Burritos El Monterey",
       "brand": null,
       "category": "Weekly ad",
       "savings": "BOGO"
@@ -373,43 +380,36 @@
       "savings": "BOGO"
     },
     {
-      "id": "1036533322",
-      "title": "Acompañante Innovasian Cuisine",
+      "id": "1036645921",
+      "title": "V8 Beverage or Juice",
       "brand": null,
       "category": "Weekly ad",
       "savings": "BOGO"
     },
     {
-      "id": "1036534483",
-      "title": "Vegetales Birds Eye",
+      "id": "1036534506",
+      "title": "Helado Breyers",
       "brand": null,
       "category": "Weekly ad",
       "savings": "BOGO"
     },
     {
-      "id": "1036613216",
-      "title": "Pepinos Hot House",
+      "id": "1036648348",
+      "title": "Klondike Bars",
       "brand": null,
       "category": "Weekly ad",
       "savings": "BOGO"
     },
     {
-      "id": "1036541174",
-      "title": "Kétchup de Tomate Heinz",
+      "id": "1036614270",
+      "title": "Palomitas de Maíz Lesserevil",
       "brand": null,
       "category": "Weekly ad",
       "savings": "BOGO"
     },
     {
-      "id": "1036534487",
-      "title": "Yogur Orgánico Stonyfield",
-      "brand": null,
-      "category": "Weekly ad",
-      "savings": "BOGO"
-    },
-    {
-      "id": "1036613842",
-      "title": "Tostaditas de Tortilla Mission",
+      "id": "1036551241",
+      "title": "Edwards Pie Slices",
       "brand": null,
       "category": "Weekly ad",
       "savings": "BOGO"
@@ -422,22 +422,36 @@
       "savings": "BOGO"
     },
     {
-      "id": "1036613747",
-      "title": "Café Molido Lavazza",
+      "id": "1036533024",
+      "title": "Pan Thomas' Swirl",
       "brand": null,
       "category": "Weekly ad",
       "savings": "BOGO"
     },
     {
-      "id": "1036643983",
-      "title": "Palmetto Pimento Cheese",
+      "id": "1036613842",
+      "title": "Tostaditas de Tortilla Mission",
       "brand": null,
       "category": "Weekly ad",
       "savings": "BOGO"
     },
     {
-      "id": "1036614277",
-      "title": "Galletas Pepperidge Farm",
+      "id": "1036644405",
+      "title": "Hot House Cucumbers",
+      "brand": null,
+      "category": "Weekly ad",
+      "savings": "BOGO"
+    },
+    {
+      "id": "1036613768",
+      "title": "Tiritas de Plátano Chifles",
+      "brand": null,
+      "category": "Weekly ad",
+      "savings": "BOGO"
+    },
+    {
+      "id": "1036577388",
+      "title": "Thomas' Swirl Bread",
       "brand": null,
       "category": "Weekly ad",
       "savings": "BOGO"
@@ -445,6 +459,27 @@
     {
       "id": "1036613093",
       "title": "Queso en Barra Cabot",
+      "brand": null,
+      "category": "Weekly ad",
+      "savings": "BOGO"
+    },
+    {
+      "id": "1036613216",
+      "title": "Pepinos Hot House",
+      "brand": null,
+      "category": "Weekly ad",
+      "savings": "BOGO"
+    },
+    {
+      "id": "1036613687",
+      "title": "Pan Nature's Own Life",
+      "brand": null,
+      "category": "Weekly ad",
+      "savings": "BOGO"
+    },
+    {
+      "id": "1036614277",
+      "title": "Galletas Pepperidge Farm",
       "brand": null,
       "category": "Weekly ad",
       "savings": "BOGO"
@@ -464,15 +499,22 @@
       "savings": "BOGO"
     },
     {
-      "id": "1036648281",
-      "title": "Wise Potato Chips",
+      "id": "1036611837",
+      "title": "Birds Eye Vegetables",
       "brand": null,
       "category": "Weekly ad",
       "savings": "BOGO"
     },
     {
-      "id": "1036613768",
-      "title": "Tiritas de Plátano Chifles",
+      "id": "1036646116",
+      "title": "Eight O'Clock Ground Coffee",
+      "brand": null,
+      "category": "Weekly ad",
+      "savings": "BOGO"
+    },
+    {
+      "id": "1036645270",
+      "title": "Nature's Own Life Bread",
       "brand": null,
       "category": "Weekly ad",
       "savings": "BOGO"
@@ -485,379 +527,64 @@
       "savings": "BOGO"
     },
     {
-      "id": "1036612809",
-      "title": "Cerveza sin Alcohol Athletic Brewing Co Paquete de 12",
+      "id": "1036648281",
+      "title": "Wise Potato Chips",
       "brand": null,
       "category": "Weekly ad",
       "savings": "BOGO"
     },
     {
-      "id": "1036544263",
-      "title": "Cerveza Landshark Island Style Lager Paquete de 12",
+      "id": "1036643983",
+      "title": "Palmetto Pimento Cheese",
       "brand": null,
       "category": "Weekly ad",
       "savings": "BOGO"
     },
     {
-      "id": "1036612815",
-      "title": "Cerveza Montucky Cold Snacks Lager Paquete de 12",
+      "id": "1036534483",
+      "title": "Vegetales Birds Eye",
       "brand": null,
       "category": "Weekly ad",
       "savings": "BOGO"
     },
     {
-      "id": "1036614246",
-      "title": "Cerveza Bud Light Lime Paquete de 12",
+      "id": "1036645589",
+      "title": "Dot's Homestyle Pretzels",
       "brand": null,
       "category": "Weekly ad",
       "savings": "BOGO"
     },
     {
-      "id": "1036648228",
-      "title": "12-Pack Bud Light Lime Beer",
+      "id": "1036647450",
+      "title": "Banquet Mega Bowls",
       "brand": null,
       "category": "Weekly ad",
       "savings": "BOGO"
     },
     {
-      "id": "1036567489",
-      "title": "Pero Family Farms Snipped Green Beans",
+      "id": "1036646394",
+      "title": "Innovasian Cuisine Side Dish,",
       "brand": null,
       "category": "Weekly ad",
       "savings": "BOGO"
     },
     {
-      "id": "1036645334",
-      "title": "Duncan Hines Brownie Mix",
+      "id": "1036642068",
+      "title": "Margaritaville Shrimp Appetizers",
       "brand": null,
       "category": "Weekly ad",
       "savings": "BOGO"
     },
     {
-      "id": "1036541178",
-      "title": "Pan Nature's Own Perfectly Crafted",
+      "id": "1036533322",
+      "title": "Acompañante Innovasian Cuisine",
       "brand": null,
       "category": "Weekly ad",
       "savings": "BOGO"
     },
     {
-      "id": "1036597598",
-      "title": "Nature's Own Perfectly Crafted Bread Or Buns Or Rolls",
-      "brand": null,
-      "category": "Weekly ad",
-      "savings": "BOGO"
-    },
-    {
-      "id": "1036646026",
-      "title": "Publix St. Louis Style Pork Spareribs",
-      "brand": null,
-      "category": "Weekly ad",
-      "savings": "BOGO"
-    },
-    {
-      "id": "1036643621",
-      "title": "Mike's Amazing Real Mayonnaise",
-      "brand": null,
-      "category": "Weekly ad",
-      "savings": "BOGO"
-    },
-    {
-      "id": "1036613795",
-      "title": "Bocados sin Gluten Heavenly Hunks",
-      "brand": null,
-      "category": "Weekly ad",
-      "savings": "BOGO"
-    },
-    {
-      "id": "1036645673",
-      "title": "AMC Theatres Microwave Popcorn",
-      "brand": null,
-      "category": "Weekly ad",
-      "savings": "BOGO"
-    },
-    {
-      "id": "1036613657",
-      "title": "Pimientos Chipotle Ahumados San Marcos",
-      "brand": null,
-      "category": "Weekly ad",
-      "savings": "BOGO"
-    },
-    {
-      "id": "1036548781",
-      "title": "Häagen-Dazs Ice Cream",
-      "brand": null,
-      "category": "Weekly ad",
-      "savings": "BOGO"
-    },
-    {
-      "id": "1036614240",
-      "title": "Bebida de Limonada con Alcohol Simply Spiked Paquete de 12",
-      "brand": null,
-      "category": "Weekly ad",
-      "savings": "BOGO"
-    },
-    {
-      "id": "1036532924",
-      "title": "Rebanadas de Pastel Relleno Edwards",
-      "brand": null,
-      "category": "Weekly ad",
-      "savings": "BOGO"
-    },
-    {
-      "id": "1036648294",
-      "title": "Betty Crocker Fruit Snacks",
-      "brand": null,
-      "category": "Weekly ad",
-      "savings": "BOGO"
-    },
-    {
-      "id": "1036612637",
-      "title": "Costillas de Cerdo Estilo St. Louis Publix",
-      "brand": null,
-      "category": "Weekly ad",
-      "savings": "BOGO"
-    },
-    {
-      "id": "1036613035",
-      "title": "Mayonesa Real Mike's Amazing",
-      "brand": null,
-      "category": "Weekly ad",
-      "savings": "BOGO"
-    },
-    {
-      "id": "1036636360",
-      "title": "Smithfield Anytime Favorites Smoked Cubed Ham",
-      "brand": null,
-      "category": "Weekly ad",
-      "savings": "BOGO"
-    },
-    {
-      "id": "1036645870",
-      "title": "Heavenly Hunks Gluten-Free Bites",
-      "brand": null,
-      "category": "Weekly ad",
-      "savings": "BOGO"
-    },
-    {
-      "id": "1036642947",
-      "title": "Farmer Focus Chicken Party Wings,",
-      "brand": null,
-      "category": "Weekly ad",
-      "savings": "BOGO"
-    },
-    {
-      "id": "1036612640",
-      "title": "Meriendas Tamaño para Fiesta Frito Lay",
-      "brand": null,
-      "category": "Weekly ad",
-      "savings": "BOGO"
-    },
-    {
-      "id": "1036638689",
-      "title": "12-Pack Montucky Cold Snacks Lager",
-      "brand": null,
-      "category": "Weekly ad",
-      "savings": "BOGO"
-    },
-    {
-      "id": "1036613709",
-      "title": "Arroz Jazmín de Grano Largo Mahatma",
-      "brand": null,
-      "category": "Weekly ad",
-      "savings": "BOGO"
-    },
-    {
-      "id": "1036534445",
-      "title": "Papas Honey Gold Potato Inspirations",
-      "brand": null,
-      "category": "Weekly ad",
-      "savings": "BOGO"
-    },
-    {
-      "id": "1036534491",
-      "title": "Crema para Untar I Can't Believe It's Not Butter!",
-      "brand": null,
-      "category": "Weekly ad",
-      "savings": "BOGO"
-    },
-    {
-      "id": "1036645287",
-      "title": "College Inn Broth Or Stock",
-      "brand": null,
-      "category": "Weekly ad",
-      "savings": "BOGO"
-    },
-    {
-      "id": "1036613700",
-      "title": "Kit para Cena de Tacos Old El Paso",
-      "brand": null,
-      "category": "Weekly ad",
-      "savings": "BOGO"
-    },
-    {
-      "id": "1036614165",
-      "title": "Pasta Tortelloni Taste Republic",
-      "brand": null,
-      "category": "Weekly ad",
-      "savings": "BOGO"
-    },
-    {
-      "id": "1036614141",
-      "title": "Bocaditos para el Desayuno Amylu",
-      "brand": null,
-      "category": "Weekly ad",
-      "savings": "BOGO"
-    },
-    {
-      "id": "1036614275",
-      "title": "Meriendas de Fruta Betty Crocker",
-      "brand": null,
-      "category": "Weekly ad",
-      "savings": "BOGO"
-    },
-    {
-      "id": "1036648321",
-      "title": "Candy Pop Popcorn Or PB&J Pop or Cookie Pop",
-      "brand": null,
-      "category": "Weekly ad",
-      "savings": "BOGO"
-    },
-    {
-      "id": "1036613041",
-      "title": "Perros Calientes Oscar Mayer",
-      "brand": null,
-      "category": "Weekly ad",
-      "savings": "BOGO"
-    },
-    {
-      "id": "1036612666",
-      "title": "Trozos de Sandía Roja sin Semillas Publix",
-      "brand": null,
-      "category": "Weekly ad",
-      "savings": "BOGO"
-    },
-    {
-      "id": "1036613678",
-      "title": "Harina de Maíz Amarillo Quaker",
-      "brand": null,
-      "category": "Weekly ad",
-      "savings": "BOGO"
-    },
-    {
-      "id": "1036613889",
-      "title": "Comida Tamaño Familiar Stouffer's",
-      "brand": null,
-      "category": "Weekly ad",
-      "savings": "BOGO"
-    },
-    {
-      "id": "1036646985",
-      "title": "Old El Paso Taco Dinner Kit",
-      "brand": null,
-      "category": "Weekly ad",
-      "savings": "BOGO"
-    },
-    {
-      "id": "1036644339",
-      "title": "Potato Inspirations Honey Gold Potatoes",
-      "brand": null,
-      "category": "Weekly ad",
-      "savings": "BOGO"
-    },
-    {
-      "id": "1036620202",
-      "title": "Chex Mix Snack Mix Or Gardetto's or Bugles",
-      "brand": null,
-      "category": "Weekly ad",
-      "savings": "BOGO"
-    },
-    {
-      "id": "1036613197",
-      "title": "Pimientos Dulces en Miniatura Pero Family Farms",
-      "brand": null,
-      "category": "Weekly ad",
-      "savings": "BOGO"
-    },
-    {
-      "id": "1036647955",
-      "title": "Taste Republic Tortelloni Pasta",
-      "brand": null,
-      "category": "Weekly ad",
-      "savings": "BOGO"
-    },
-    {
-      "id": "1036646415",
-      "title": "Stouffer's Family Size Entrée",
-      "brand": null,
-      "category": "Weekly ad",
-      "savings": "BOGO"
-    },
-    {
-      "id": "1036613240",
-      "title": "Bebida de Lima Florida's Natural",
-      "brand": null,
-      "category": "Weekly ad",
-      "savings": "BOGO"
-    },
-    {
-      "id": "1036613664",
-      "title": "Salsa Gourmet Asada al Fuego Casa Martinez",
-      "brand": null,
-      "category": "Weekly ad",
-      "savings": "BOGO"
-    },
-    {
-      "id": "1036533136",
-      "title": "Filete de Cerdo Prairie Fresh",
-      "brand": null,
-      "category": "Weekly ad",
-      "savings": "BOGO"
-    },
-    {
-      "id": "1036614267",
-      "title": "Refrescos Coca-Cola Paquete de 6",
-      "brand": null,
-      "category": "Weekly ad",
-      "savings": "BOGO"
-    },
-    {
-      "id": "1036613019",
-      "title": "Brochetas de Carne de Res Demakes Bros.",
-      "brand": null,
-      "category": "Weekly ad",
-      "savings": "BOGO"
-    },
-    {
-      "id": "1036647346",
-      "title": "Marie Callender's Meal to Share",
-      "brand": null,
-      "category": "Weekly ad",
-      "savings": "BOGO"
-    },
-    {
-      "id": "1036647096",
-      "title": "Springer Mountain Farms Chicken Wings",
-      "brand": null,
-      "category": "Weekly ad",
-      "savings": "BOGO"
-    },
-    {
-      "id": "1036646042",
-      "title": "Publix Red Seedless Watermelon Chunks",
-      "brand": null,
-      "category": "Weekly ad",
-      "savings": "BOGO"
-    },
-    {
-      "id": "1036613926",
-      "title": "Alitas de Pollo Springer Mountain Farms",
-      "brand": null,
-      "category": "Weekly ad",
-      "savings": "BOGO"
-    },
-    {
-      "id": "1036613502",
-      "title": "Champiñones Blancos Orgánicos GreenWise",
+      "id": "1036544044",
+      "title": "Dip de Hummus Sabra",
       "brand": null,
       "category": "Weekly ad",
       "savings": "BOGO"
@@ -870,43 +597,190 @@
       "savings": "BOGO"
     },
     {
-      "id": "1036612214",
-      "title": "Pompeian Imported Olive Oil,",
+      "id": "1036648243",
+      "title": "Maison de Madeleine Brut Wine",
       "brand": null,
       "category": "Weekly ad",
       "savings": "BOGO"
     },
     {
-      "id": "1036613952",
-      "title": "Café Colado en Frío Califia Farms",
+      "id": "1036612690",
+      "title": "Mezcla Completa para Waffles y para Panqueques Hungry Jack",
       "brand": null,
       "category": "Weekly ad",
       "savings": "BOGO"
     },
     {
-      "id": "1036613943",
-      "title": "Masa para Galletas Sweet Loren's",
+      "id": "1036645870",
+      "title": "Heavenly Hunks Gluten-Free Bites",
       "brand": null,
       "category": "Weekly ad",
       "savings": "BOGO"
     },
     {
-      "id": "1036577362",
-      "title": "General Mills Cheerios Cereal",
+      "id": "1036638689",
+      "title": "12-Pack Montucky Cold Snacks Lager",
       "brand": null,
       "category": "Weekly ad",
       "savings": "BOGO"
     },
     {
-      "id": "1036613935",
-      "title": "Kraft Philadelphia Cream Cheese",
+      "id": "1036648335",
+      "title": "Pure Life Purified Water",
       "brand": null,
       "category": "Weekly ad",
       "savings": "BOGO"
     },
     {
-      "id": "1036635883",
-      "title": "Kellogg's Frosted Flakes Cereal",
+      "id": "1036614141",
+      "title": "Bocaditos para el Desayuno Amylu",
+      "brand": null,
+      "category": "Weekly ad",
+      "savings": "BOGO"
+    },
+    {
+      "id": "1036636262",
+      "title": "Hungry Jack Complete Pancake & Waffle Mix",
+      "brand": null,
+      "category": "Weekly ad",
+      "savings": "BOGO"
+    },
+    {
+      "id": "1036620202",
+      "title": "Chex Mix Snack Mix Or Gardetto's or Bugles",
+      "brand": null,
+      "category": "Weekly ad",
+      "savings": "BOGO"
+    },
+    {
+      "id": "1037736171",
+      "title": "Weber Ranch 1902 Vodka",
+      "brand": null,
+      "category": "Weekly ad",
+      "savings": "BOGO"
+    },
+    {
+      "id": "1036636360",
+      "title": "Smithfield Anytime Favorites Smoked Cubed Ham",
+      "brand": null,
+      "category": "Weekly ad",
+      "savings": "BOGO"
+    },
+    {
+      "id": "1036643621",
+      "title": "Mike's Amazing Real Mayonnaise",
+      "brand": null,
+      "category": "Weekly ad",
+      "savings": "BOGO"
+    },
+    {
+      "id": "1036613035",
+      "title": "Mayonesa Real Mike's Amazing",
+      "brand": null,
+      "category": "Weekly ad",
+      "savings": "BOGO"
+    },
+    {
+      "id": "1036613019",
+      "title": "Brochetas de Carne de Res Demakes Bros.",
+      "brand": null,
+      "category": "Weekly ad",
+      "savings": "BOGO"
+    },
+    {
+      "id": "1036533136",
+      "title": "Filete de Cerdo Prairie Fresh",
+      "brand": null,
+      "category": "Weekly ad",
+      "savings": "BOGO"
+    },
+    {
+      "id": "1036613678",
+      "title": "Harina de Maíz Amarillo Quaker",
+      "brand": null,
+      "category": "Weekly ad",
+      "savings": "BOGO"
+    },
+    {
+      "id": "1036646026",
+      "title": "Publix St. Louis Style Pork Spareribs",
+      "brand": null,
+      "category": "Weekly ad",
+      "savings": "BOGO"
+    },
+    {
+      "id": "1036613041",
+      "title": "Perros Calientes Oscar Mayer",
+      "brand": null,
+      "category": "Weekly ad",
+      "savings": "BOGO"
+    },
+    {
+      "id": "1036532924",
+      "title": "Rebanadas de Pastel Relleno Edwards",
+      "brand": null,
+      "category": "Weekly ad",
+      "savings": "BOGO"
+    },
+    {
+      "id": "1036645673",
+      "title": "AMC Theatres Microwave Popcorn",
+      "brand": null,
+      "category": "Weekly ad",
+      "savings": "BOGO"
+    },
+    {
+      "id": "1036648321",
+      "title": "Candy Pop Popcorn Or PB&J Pop or Cookie Pop",
+      "brand": null,
+      "category": "Weekly ad",
+      "savings": "BOGO"
+    },
+    {
+      "id": "1036612666",
+      "title": "Trozos de Sandía Roja sin Semillas Publix",
+      "brand": null,
+      "category": "Weekly ad",
+      "savings": "BOGO"
+    },
+    {
+      "id": "1036613657",
+      "title": "Pimientos Chipotle Ahumados San Marcos",
+      "brand": null,
+      "category": "Weekly ad",
+      "savings": "BOGO"
+    },
+    {
+      "id": "1036534445",
+      "title": "Papas Honey Gold Potato Inspirations",
+      "brand": null,
+      "category": "Weekly ad",
+      "savings": "BOGO"
+    },
+    {
+      "id": "1036614165",
+      "title": "Pasta Tortelloni Taste Republic",
+      "brand": null,
+      "category": "Weekly ad",
+      "savings": "BOGO"
+    },
+    {
+      "id": "1036647955",
+      "title": "Taste Republic Tortelloni Pasta",
+      "brand": null,
+      "category": "Weekly ad",
+      "savings": "BOGO"
+    },
+    {
+      "id": "1036613502",
+      "title": "Champiñones Blancos Orgánicos GreenWise",
+      "brand": null,
+      "category": "Weekly ad",
+      "savings": "BOGO"
+    },
+    {
+      "id": "1036613197",
+      "title": "Pimientos Dulces en Miniatura Pero Family Farms",
       "brand": null,
       "category": "Weekly ad",
       "savings": "BOGO"
@@ -919,6 +793,69 @@
       "savings": "BOGO"
     },
     {
+      "id": "1036612637",
+      "title": "Costillas de Cerdo Estilo St. Louis Publix",
+      "brand": null,
+      "category": "Weekly ad",
+      "savings": "BOGO"
+    },
+    {
+      "id": "1036597598",
+      "title": "Nature's Own Perfectly Crafted Bread Or Buns Or Rolls",
+      "brand": null,
+      "category": "Weekly ad",
+      "savings": "BOGO"
+    },
+    {
+      "id": "1036648294",
+      "title": "Betty Crocker Fruit Snacks",
+      "brand": null,
+      "category": "Weekly ad",
+      "savings": "BOGO"
+    },
+    {
+      "id": "1036648228",
+      "title": "12-Pack Bud Light Lime Beer",
+      "brand": null,
+      "category": "Weekly ad",
+      "savings": "BOGO"
+    },
+    {
+      "id": "1036635883",
+      "title": "Kellogg's Frosted Flakes Cereal",
+      "brand": null,
+      "category": "Weekly ad",
+      "savings": "BOGO"
+    },
+    {
+      "id": "1036644726",
+      "title": "12-Pack Landshark Island Style Lager",
+      "brand": null,
+      "category": "Weekly ad",
+      "savings": "BOGO"
+    },
+    {
+      "id": "1036614246",
+      "title": "Cerveza Bud Light Lime Paquete de 12",
+      "brand": null,
+      "category": "Weekly ad",
+      "savings": "BOGO"
+    },
+    {
+      "id": "1036612809",
+      "title": "Cerveza sin Alcohol Athletic Brewing Co Paquete de 12",
+      "brand": null,
+      "category": "Weekly ad",
+      "savings": "BOGO"
+    },
+    {
+      "id": "1036613240",
+      "title": "Bebida de Lima Florida's Natural",
+      "brand": null,
+      "category": "Weekly ad",
+      "savings": "BOGO"
+    },
+    {
       "id": "1036552514",
       "title": "Pretzelized Snacks Pretzel Pita Chips,",
       "brand": null,
@@ -926,50 +863,22 @@
       "savings": "BOGO"
     },
     {
-      "id": "1036647460",
-      "title": "Sweet Loren's Cookie Dough",
+      "id": "1036642947",
+      "title": "Farmer Focus Chicken Party Wings,",
       "brand": null,
       "category": "Weekly ad",
       "savings": "BOGO"
     },
     {
-      "id": "1036541227",
-      "title": "Cape Cod Kettle Cooked Potato Chips",
+      "id": "1036645334",
+      "title": "Duncan Hines Brownie Mix",
       "brand": null,
       "category": "Weekly ad",
       "savings": "BOGO"
     },
     {
-      "id": "1036644073",
-      "title": "Cabot Cheese Bar Or Shredded",
-      "brand": null,
-      "category": "Weekly ad",
-      "savings": "BOGO"
-    },
-    {
-      "id": "1036541190",
-      "title": "Aceite de Oliva Importado Pompeian",
-      "brand": null,
-      "category": "Weekly ad",
-      "savings": "BOGO"
-    },
-    {
-      "id": "1036644019",
-      "title": "Polly-O Mozzarella String Cheese Or Cheese Twists",
-      "brand": null,
-      "category": "Weekly ad",
-      "savings": "BOGO"
-    },
-    {
-      "id": "1036645890",
-      "title": "Keebler Fudge Stripes Cookies",
-      "brand": null,
-      "category": "Weekly ad",
-      "savings": "BOGO"
-    },
-    {
-      "id": "1036612717",
-      "title": "Cereal Kellogg's Frosted Flakes",
+      "id": "1036613926",
+      "title": "Alitas de Pollo Springer Mountain Farms",
       "brand": null,
       "category": "Weekly ad",
       "savings": "BOGO"
@@ -982,8 +891,8 @@
       "savings": "BOGO"
     },
     {
-      "id": "1036545648",
-      "title": "Galletas Nabisco Honey Maid Grahams",
+      "id": "1036614275",
+      "title": "Meriendas de Fruta Betty Crocker",
       "brand": null,
       "category": "Weekly ad",
       "savings": "BOGO"
@@ -1003,91 +912,182 @@
       "savings": "BOGO"
     },
     {
-      "id": "1036648243",
-      "title": "Maison de Madeleine Brut Wine",
+      "id": "1036645890",
+      "title": "Keebler Fudge Stripes Cookies",
       "brand": null,
       "category": "Weekly ad",
       "savings": "BOGO"
     },
     {
-      "id": "1036612758",
-      "title": "Cóctel de Vodka Sinless Paquete de 8",
+      "id": "1036647460",
+      "title": "Sweet Loren's Cookie Dough",
       "brand": null,
       "category": "Weekly ad",
       "savings": "BOGO"
     },
     {
-      "id": "1036612768",
-      "title": "Vino Cabernet Sauvignon Clay Creek",
+      "id": "1036644019",
+      "title": "Polly-O Mozzarella String Cheese Or Cheese Twists",
       "brand": null,
       "category": "Weekly ad",
       "savings": "BOGO"
     },
     {
-      "id": "1036636262",
-      "title": "Hungry Jack Complete Pancake & Waffle Mix",
+      "id": "1036577362",
+      "title": "General Mills Cheerios Cereal",
       "brand": null,
       "category": "Weekly ad",
       "savings": "BOGO"
     },
     {
-      "id": "1036614272",
-      "title": "Agua Purificada Pure Life",
+      "id": "1036541227",
+      "title": "Cape Cod Kettle Cooked Potato Chips",
       "brand": null,
       "category": "Weekly ad",
       "savings": "BOGO"
     },
     {
-      "id": "1036648335",
-      "title": "Pure Life Purified Water",
+      "id": "1036534491",
+      "title": "Crema para Untar I Can't Believe It's Not Butter!",
       "brand": null,
       "category": "Weekly ad",
       "savings": "BOGO"
     },
     {
-      "id": "1036612690",
-      "title": "Mezcla Completa para Waffles y para Panqueques Hungry Jack",
+      "id": "1036612717",
+      "title": "Cereal Kellogg's Frosted Flakes",
       "brand": null,
       "category": "Weekly ad",
       "savings": "BOGO"
     },
     {
-      "id": "4098d432-c1ed-458a-a477-e561a699b390",
+      "id": "1036647346",
+      "title": "Marie Callender's Meal to Share",
+      "brand": null,
+      "category": "Weekly ad",
+      "savings": "BOGO"
+    },
+    {
+      "id": "1036545648",
+      "title": "Galletas Nabisco Honey Maid Grahams",
+      "brand": null,
+      "category": "Weekly ad",
+      "savings": "BOGO"
+    },
+    {
+      "id": "1036613943",
+      "title": "Masa para Galletas Sweet Loren's",
+      "brand": null,
+      "category": "Weekly ad",
+      "savings": "BOGO"
+    },
+    {
+      "id": "1036613795",
+      "title": "Bocados sin Gluten Heavenly Hunks",
+      "brand": null,
+      "category": "Weekly ad",
+      "savings": "BOGO"
+    },
+    {
+      "id": "1036541178",
+      "title": "Pan Nature's Own Perfectly Crafted",
+      "brand": null,
+      "category": "Weekly ad",
+      "savings": "BOGO"
+    },
+    {
+      "id": "1036644073",
+      "title": "Cabot Cheese Bar Or Shredded",
+      "brand": null,
+      "category": "Weekly ad",
+      "savings": "BOGO"
+    },
+    {
+      "id": "1036541190",
+      "title": "Aceite de Oliva Importado Pompeian",
+      "brand": null,
+      "category": "Weekly ad",
+      "savings": "BOGO"
+    },
+    {
+      "id": "1036613664",
+      "title": "Salsa Gourmet Asada al Fuego Casa Martinez",
+      "brand": null,
+      "category": "Weekly ad",
+      "savings": "BOGO"
+    },
+    {
+      "id": "1036613709",
+      "title": "Arroz Jazmín de Grano Largo Mahatma",
+      "brand": null,
+      "category": "Weekly ad",
+      "savings": "BOGO"
+    },
+    {
+      "id": "1036613889",
+      "title": "Comida Tamaño Familiar Stouffer's",
+      "brand": null,
+      "category": "Weekly ad",
+      "savings": "BOGO"
+    },
+    {
+      "id": "1036646415",
+      "title": "Stouffer's Family Size Entrée",
+      "brand": null,
+      "category": "Weekly ad",
+      "savings": "BOGO"
+    },
+    {
+      "id": "1036646985",
+      "title": "Old El Paso Taco Dinner Kit",
+      "brand": null,
+      "category": "Weekly ad",
+      "savings": "BOGO"
+    },
+    {
+      "id": "1036613700",
+      "title": "Kit para Cena de Tacos Old El Paso",
+      "brand": null,
+      "category": "Weekly ad",
+      "savings": "BOGO"
+    },
+    {
+      "id": "5e47fd9b-3ff4-4278-8a46-f7456f9a245c",
       "title": "Buy any TWO (2) Alani Nu (12oz) and Get ONE (1) Alani Nu (12oz) can FREE",
       "brand": "Alani Nu",
       "category": "Digital coupon",
       "savings": "Buy 2 Get 1 Free"
     },
     {
-      "id": "2a21e026-7d1d-4584-bd28-9b99b9449f07",
+      "id": "f0c82354-7d0a-4827-b944-2b9e7a5406d4",
       "title": "Buy any ONE (1) Coca-Cola 20oz Soft Drinks Product and Get any ONE (1) Minute Maid 20oz FREE",
       "brand": "Coca-Cola, Minute Maid",
       "category": "Digital coupon",
       "savings": "Free with purchase"
     },
     {
-      "id": "7fba193f-2aa7-44de-8645-cd868493f2f4",
+      "id": "966bb4ee-085e-4537-a06c-0c723d2a4d8c",
       "title": "Buy ONE (1) 20oz MOUNTAIN DEW® and get ONE (1) DORITOS® Single (XXVL) 2.3 - 4oz bag free",
       "brand": "MOUNTAIN DEW, DORITOS",
       "category": "Digital coupon",
       "savings": "Free with purchase"
     },
     {
-      "id": "e760b680-4396-432b-a8a9-2b0b874be5b7",
+      "id": "7808df98-4ee4-4d18-88f5-422b7a9b7826",
       "title": "Buy any ONE (1) PEPSI (20oz) and get ONE (1) PEPSI Zero Sugar, (20oz) or DIET PEPSI (20oz) Free",
       "brand": "Pepsi & Pepsi Zero Sugar",
       "category": "Digital coupon",
       "savings": "Free with purchase"
     },
     {
-      "id": "dd731002-cd9e-4f6f-ad90-cdb8bb22b725",
+      "id": "23610929-28e0-4c8c-bd0f-863bb4b45792",
       "title": "Buy any ONE (1) Propel® 20oz and Get any ONE (1) Propel® 20oz free",
       "brand": "Propel",
       "category": "Digital coupon",
       "savings": "Buy 1 Get 1 Free"
     },
     {
-      "id": "ececb9b7-50b1-42aa-a616-f3bfc6495b4d",
+      "id": "afb66147-b604-4584-8cf7-f71ad1422de1",
       "title": "Buy ONE (1) Publix Vanilla Ice Cream, Half Gallon, get ONE (1) FREE 16oz can of Sparkling Ice Caffeine: Root Beer, Cherry Cola, Orange Cream varieties",
       "brand": "Sparkling Ice Caffeine 16oz",
       "category": "Digital coupon",
