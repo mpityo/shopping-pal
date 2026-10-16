@@ -1,6 +1,6 @@
 {
   "status": "ok",
-  "updated": "2026-10-15T15:31:38.087Z",
+  "updated": "2026-10-16T15:17:35.921Z",
   "store": "Publix store #111",
   "storeNumber": "111",
   "validThrough": "2026-10-20",
@@ -1045,42 +1045,42 @@
       "savings": "BOGO"
     },
     {
-      "id": "643fb4b5-6e6b-4b78-988f-26d47861850d",
+      "id": "5fd20cee-5160-4457-875d-3273994fad4d",
       "title": "Buy any ONE (1) Coca-Cola 20oz Soft Drinks Product and Get any ONE (1) Fanta Product Free (Excludes Dr Pepper and Dasani)",
       "brand": "Coca-Cola, Fanta",
       "category": "Digital coupon",
       "savings": "Free with purchase"
     },
     {
-      "id": "d2b190c3-da25-4f45-8216-45ef29045014",
+      "id": "ac58e89b-a963-422d-9a79-30696270f69c",
       "title": "Buy Any ONE (1) Core Power 26g/42g 14oz and Get Any ONE (1) Vitaminwater 20oz or Smartwater 700mL FREE",
       "brand": "Core Power, Smartwater, Vitaminwater",
       "category": "Digital coupon",
       "savings": "Free with purchase"
     },
     {
-      "id": "b8850681-da27-45a1-b9eb-a44d6fb4348c",
+      "id": "aa858508-a6f1-4fe9-9465-abb244dfbf0a",
       "title": "Buy any ONE (1) Degree Deodorant Dry Spray or Whole Body 2.9-3.8-oz and Get ONE (1) FREE (equal or lesser value)",
       "brand": "Degree",
       "category": "Digital coupon",
       "savings": "Buy 1 Get 1 Free"
     },
     {
-      "id": "92ce2c32-bc54-499c-a798-a1d9b15c8793",
+      "id": "5b58385f-51d4-4560-b6a5-ae55a604f341",
       "title": "Buy any ONE (1) Dove Men+Care Dedorant Dry Spray or Whole Body 3.8-4-oz and Get ONE (1) FREE (equal or lesser value)",
       "brand": "Dove Men+Care",
       "category": "Digital coupon",
       "savings": "Buy 1 Get 1 Free"
     },
     {
-      "id": "6df34396-c946-47d2-a6fe-aa2e6772c9ce",
+      "id": "95a0d800-65f1-4811-8049-25a4a824a317",
       "title": "Buy any ONE (1) Lotus Foods Ramen 4pk and Get ONE (1) Free",
       "brand": "Lotus Foods",
       "category": "Digital coupon",
       "savings": "Buy 1 Get 1 Free"
     },
     {
-      "id": "33318fbf-de74-41ed-9cf4-38dc00451a97",
+      "id": "fc996f76-711f-4b96-99d9-87ec832edc7e",
       "title": "Buy any ONE (1) Starbucks Coffee & Protein 12-oz and Get ONE (1) Free",
       "brand": "Starbucks",
       "category": "Digital coupon",
